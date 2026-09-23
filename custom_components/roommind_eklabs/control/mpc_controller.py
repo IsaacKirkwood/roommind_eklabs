@@ -1722,11 +1722,33 @@ class MPCController:
                         and data["hvac_mode"] not in ("off", "fan_only")
                         and "fan_only" in hvac_modes
                     ):
-                        resolved = "fan_only"
+                        # Some integrations expose only off/fan_only until the
+                        # appliance wakes.  fan_only is a pre-activation step,
+                        # not a replacement for the requested heat/cool mode.
+                        # Send the requested mode immediately afterwards even
+                        # when the stale mode list does not advertise it.
+                        try:
+                            await self.hass.services.async_call(
+                                "climate",
+                                "set_hvac_mode",
+                                {"entity_id": eid, "hvac_mode": "fan_only"},
+                                blocking=True,
+                                context=make_roommind_context(),
+                            )
+                        except Exception:  # noqa: BLE001
+                            _LOGGER.debug(
+                                "Area '%s': device '%s' fan-only pre-activation failed; sending '%s' directly",
+                                self._area_id,
+                                eid,
+                                data["hvac_mode"],
+                                exc_info=True,
+                            )
+                        resolved = data["hvac_mode"]
                         _LOGGER.debug(
-                            "Area '%s': device '%s' is off with incomplete modes, pre-activating via fan_only (#135)",
+                            "Area '%s': device '%s' is off with incomplete modes, pre-activating via fan_only before '%s' (#135)",
                             self._area_id,
                             eid,
+                            resolved,
                         )
                     else:
                         resolved = data["hvac_mode"]

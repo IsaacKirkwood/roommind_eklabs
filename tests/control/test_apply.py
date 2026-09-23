@@ -3642,7 +3642,7 @@ async def test_apply_idle_forced_on_managed_mode():
 
 @pytest.mark.asyncio
 async def test_apply_heating_ac_unreliable_modes_preactivates_fan_only():
-    """AC off with only off+fan_only pre-activates via fan_only (#135)."""
+    """AC off with only off+fan_only wakes, then receives heat (#135)."""
     _last_commands.clear()
     hass = build_hass()
     ac_state = MagicMock()
@@ -3663,8 +3663,7 @@ async def test_apply_heating_ac_unreliable_modes_preactivates_fan_only():
 
     calls = hass.services.async_call.call_args_list
     hvac_calls = [c for c in calls if c[0][1] == "set_hvac_mode"]
-    assert len(hvac_calls) >= 1
-    assert hvac_calls[0][0][2]["hvac_mode"] == "fan_only"
+    assert [call[0][2]["hvac_mode"] for call in hvac_calls[:2]] == ["fan_only", "heat"]
 
 
 @pytest.mark.asyncio
@@ -3700,15 +3699,16 @@ async def test_apply_heating_ac_unreliable_fan_only_zone_sends_heat():
 
 @pytest.mark.asyncio
 async def test_apply_cooling_ac_unreliable_modes_preactivates_fan_only():
-    """AC off with unreliable modes pre-activates via fan_only for cooling (#135)."""
+    """Jacob's Dyson wakes via fan_only, then receives the requested cool mode."""
     _last_commands.clear()
     hass = build_hass()
     ac_state = MagicMock()
     ac_state.state = "off"
     ac_state.attributes = {"hvac_modes": ["off", "fan_only"], "temperature": 28.0, "min_temp": 16, "max_temp": 30}
+    entity_id = "climate.jacob_bedroom_jacob_bedroom_dyson"
     hass.states.get = MagicMock(return_value=ac_state)
 
-    room = make_room(thermostats=[], acs=["climate.ac"])
+    room = make_room(thermostats=[], acs=[entity_id])
     ctrl = MPCController(
         hass,
         room,
@@ -3720,9 +3720,8 @@ async def test_apply_cooling_ac_unreliable_modes_preactivates_fan_only():
     await ctrl.async_apply("cooling", 24.0)
 
     calls = hass.services.async_call.call_args_list
-    hvac_calls = [c for c in calls if c[0][1] == "set_hvac_mode"]
-    assert len(hvac_calls) >= 1
-    assert hvac_calls[0][0][2]["hvac_mode"] == "fan_only"
+    hvac_calls = [c for c in calls if c[0][1] == "set_hvac_mode" and c[0][2]["entity_id"] == entity_id]
+    assert [call[0][2]["hvac_mode"] for call in hvac_calls[:2]] == ["fan_only", "cool"]
 
 
 @pytest.mark.asyncio
