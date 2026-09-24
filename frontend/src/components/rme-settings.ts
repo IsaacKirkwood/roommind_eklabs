@@ -76,7 +76,8 @@ export class RsSettings extends LitElement {
   @state() private _wholeHouseAverage: WholeHouseAverage = {
     temperature_sensors: [],
     temperature_offsets: {},
-    humidity_sensor: "",
+    humidity_sensors: [],
+    humidity_offsets: {},
     home_presence_entities: [],
     occupancy_entities: [],
     media_player_entities: [],
@@ -179,24 +180,37 @@ export class RsSettings extends LitElement {
       this._sharedHeatSources = s.shared_heat_sources ?? [];
       this._wholeHousePlant = { ...this._wholeHousePlant, ...(s.whole_house_plant ?? {}) };
       const legacyHeat = this._sharedHeatSources[0];
-      this._wholeHouseAverage = s.whole_house_average ?? {
-        temperature_sensors: this._wholeHousePlant.temperature_sensors.length
-          ? this._wholeHousePlant.temperature_sensors
-          : (legacyHeat?.temperature_sensors ?? []),
-        temperature_offsets: Object.keys(this._wholeHousePlant.temperature_offsets).length
-          ? this._wholeHousePlant.temperature_offsets
-          : (legacyHeat?.temperature_offsets ?? {}),
-        humidity_sensor: this._wholeHousePlant.indoor_humidity_sensor,
-        home_presence_entities: this._wholeHousePlant.home_presence_entities.length
-          ? this._wholeHousePlant.home_presence_entities
-          : (legacyHeat?.home_presence_entities ?? []),
-        occupancy_entities: this._wholeHousePlant.occupancy_entities.length
-          ? this._wholeHousePlant.occupancy_entities
-          : (legacyHeat?.occupancy_entities ?? []),
-        media_player_entities: this._wholeHousePlant.media_player_entities.length
-          ? this._wholeHousePlant.media_player_entities
-          : (legacyHeat?.media_player_entities ?? []),
-      };
+      const savedAverage = s.whole_house_average as
+        (WholeHouseAverage & { humidity_sensor?: string }) | undefined;
+      this._wholeHouseAverage = savedAverage
+        ? {
+            ...savedAverage,
+            humidity_sensors:
+              savedAverage.humidity_sensors ??
+              (savedAverage.humidity_sensor ? [savedAverage.humidity_sensor] : []),
+            humidity_offsets: savedAverage.humidity_offsets ?? {},
+          }
+        : {
+            temperature_sensors: this._wholeHousePlant.temperature_sensors.length
+              ? this._wholeHousePlant.temperature_sensors
+              : (legacyHeat?.temperature_sensors ?? []),
+            temperature_offsets: Object.keys(this._wholeHousePlant.temperature_offsets).length
+              ? this._wholeHousePlant.temperature_offsets
+              : (legacyHeat?.temperature_offsets ?? {}),
+            humidity_sensors: this._wholeHousePlant.indoor_humidity_sensor
+              ? [this._wholeHousePlant.indoor_humidity_sensor]
+              : [],
+            humidity_offsets: {},
+            home_presence_entities: this._wholeHousePlant.home_presence_entities.length
+              ? this._wholeHousePlant.home_presence_entities
+              : (legacyHeat?.home_presence_entities ?? []),
+            occupancy_entities: this._wholeHousePlant.occupancy_entities.length
+              ? this._wholeHousePlant.occupancy_entities
+              : (legacyHeat?.occupancy_entities ?? []),
+            media_player_entities: this._wholeHousePlant.media_player_entities.length
+              ? this._wholeHousePlant.media_player_entities
+              : (legacyHeat?.media_player_entities ?? []),
+          };
       this._coilDryEnabled = s.coil_dry_enabled ?? false;
       this._coilDryMinutes = s.coil_dry_minutes ?? 20;
       this._coilDryMode = s.coil_dry_mode ?? "fan_only";

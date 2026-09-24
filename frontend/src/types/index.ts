@@ -183,6 +183,7 @@ export interface WholeHousePlant {
     reason?: string;
     fault?: string | null;
     current_temperature?: number | null;
+    current_humidity?: number | null;
     cooling_allowed?: boolean;
     fan_speed?: number | null;
     predicted_temperature?: number | null;
@@ -196,7 +197,8 @@ export interface WholeHousePlant {
 export interface WholeHouseAverage {
   temperature_sensors: string[];
   temperature_offsets: Record<string, number>;
-  humidity_sensor: string;
+  humidity_sensors: string[];
+  humidity_offsets: Record<string, number>;
   home_presence_entities: string[];
   occupancy_entities: string[];
   media_player_entities: string[];

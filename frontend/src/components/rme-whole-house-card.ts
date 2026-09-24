@@ -200,6 +200,7 @@ export class RmeWholeHouseCard extends LitElement {
               <h3>Whole House</h3>
               <div class="status">
                 ${overallStatus} · ${mpcStatus}
+                ${typeof plantLive?.current_humidity === "number" ? ` · ${plantLive.current_humidity.toFixed(0)}% RH` : ""}
                 ${
                   scheduled
                     ? ` · Schedule ${effectivePreset === "eco" ? "Eco" : "Comfort"}`

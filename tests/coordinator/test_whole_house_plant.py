@@ -29,7 +29,8 @@ def test_shared_house_average_prefers_canonical_settings(hass, mock_config_entry
     settings["whole_house_average"] = {
         "temperature_sensors": ["sensor.house_average"],
         "temperature_offsets": {"sensor.house_average": -0.5},
-        "humidity_sensor": "sensor.house_humidity",
+        "humidity_sensors": ["sensor.house_humidity"],
+        "humidity_offsets": {"sensor.house_humidity": -2.0},
         "home_presence_entities": ["person.household"],
         "occupancy_entities": ["binary_sensor.downstairs"],
         "media_player_entities": ["media_player.lounge"],
@@ -87,6 +88,38 @@ async def test_plant_commands_evaporative_cooling(hass, mock_config_entry):
     assert coordinator._whole_house_plant_live["current_temperature"] == 27.0
     assert coordinator._whole_house_plant_live["mode"] == "cool"
     assert coordinator._whole_house_plant_live["fan_speed"] == 8
+
+
+@pytest.mark.asyncio
+async def test_plant_averages_corrected_humidity_sensors(hass, mock_config_entry):
+    coordinator = _create_coordinator(hass, mock_config_entry)
+    coordinator.outdoor_temp_effective = 22.0
+    coordinator.outdoor_humidity = 40.0
+    hass.config.units.temperature_unit = UnitOfTemperature.CELSIUS
+    settings = _settings()
+    settings["whole_house_average"] = {
+        "temperature_sensors": ["sensor.living_temperature"],
+        "temperature_offsets": {},
+        "humidity_sensors": ["sensor.living_humidity", "sensor.office_humidity"],
+        "humidity_offsets": {"sensor.office_humidity": -10.0},
+        "home_presence_entities": ["person.isaac"],
+        "occupancy_entities": ["binary_sensor.downstairs_presence"],
+        "media_player_entities": [],
+    }
+    states = {
+        "climate.magiqtouch_zone_1": State("climate.magiqtouch_zone_1", "off"),
+        "sensor.living_temperature": State("sensor.living_temperature", "28", {"unit_of_measurement": "°C"}),
+        "sensor.living_humidity": State("sensor.living_humidity", "50"),
+        "sensor.office_humidity": State("sensor.office_humidity", "60"),
+        "person.isaac": State("person.isaac", "home"),
+        "binary_sensor.downstairs_presence": State("binary_sensor.downstairs_presence", "on"),
+    }
+    hass.states.get.side_effect = states.get
+    hass.services.async_call = AsyncMock()
+
+    await coordinator._async_control_whole_house_plant({}, settings)
+
+    assert coordinator._whole_house_plant_live["current_humidity"] == 50.0
 
 
 @pytest.mark.asyncio

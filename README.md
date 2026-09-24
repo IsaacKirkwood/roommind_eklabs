@@ -19,7 +19,7 @@
 ### EKLabs additions
 
 - **Whole-House Gas Heating** - A central heat source can maintain a configurable house target while local room heaters provide targeted trim heating.
-- **Corrected Sensor Averaging** - Combine multiple temperature sensors into the whole-house reading and apply a correction to each sensor independently.
+- **Corrected Sensor Averaging** - Combine multiple temperature and humidity sensors into whole-house readings and apply a correction to each sensor independently.
 - **Occupancy-Led Plant Control** - Gate whole-house operation using household presence, downstairs presence sensors, and active media players.
 - **Whole-House Comfort Schedule** - Switch the central heating target between Comfort and Eco using a Home Assistant schedule helper.
 - **Single-Zone Evaporative Cooling** - MagIQtouch plant control for whole-house cooling and fresh air, with adaptive fan speed, separate configurable 30-minute cooling and fan-only minimum runs, optional exhaust-path confirmation, live controls on the Rooms page, and weather, wet-bulb, humidity, runtime, feedback, presence, and gas-heating interlocks.

@@ -469,14 +469,26 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         """Return shared house inputs, falling back to pre-v0.7 plant settings."""
         shared = settings.get("whole_house_average") or {}
         if shared:
-            return shared
+            humidity_sensors = shared.get("humidity_sensors", [])
+            if not humidity_sensors and shared.get("humidity_sensor"):
+                humidity_sensors = [shared["humidity_sensor"]]
+            return {
+                **shared,
+                "humidity_sensors": humidity_sensors,
+                "humidity_offsets": shared.get("humidity_offsets", {}),
+            }
         plant = settings.get("whole_house_plant") or {}
         sources = settings.get("shared_heat_sources") or []
         heat = sources[0] if sources else {}
         return {
             "temperature_sensors": plant.get("temperature_sensors") or heat.get("temperature_sensors", []),
             "temperature_offsets": plant.get("temperature_offsets") or heat.get("temperature_offsets", {}),
-            "humidity_sensor": plant.get("indoor_humidity_sensor", ""),
+            "humidity_sensors": (
+                [plant["indoor_humidity_sensor"]]
+                if plant.get("indoor_humidity_sensor")
+                else []
+            ),
+            "humidity_offsets": {},
             "home_presence_entities": plant.get("home_presence_entities") or heat.get("home_presence_entities", []),
             "occupancy_entities": plant.get("occupancy_entities") or heat.get("occupancy_entities", []),
             "media_player_entities": plant.get("media_player_entities") or heat.get("media_player_entities", []),
@@ -616,9 +628,15 @@ class RoomMindCoordinator(DataUpdateCoordinator):
 
         indoor_temperature = self._read_whole_house_temperature(room_states, settings)
         average = self._whole_house_average_settings(settings)
-        indoor_humidity = read_sensor_value(
-            self.hass, average.get("humidity_sensor"), "whole_house_plant", "humidity"
-        )
+        humidity_values: list[float] = []
+        humidity_offsets = average.get("humidity_offsets", {})
+        for entity_id in average.get("humidity_sensors", []):
+            value = read_sensor_value(self.hass, entity_id, "whole_house_plant", "humidity")
+            if value is not None:
+                humidity_values.append(
+                    min(100.0, max(0.0, value + float(humidity_offsets.get(entity_id, 0.0))))
+                )
+        indoor_humidity = sum(humidity_values) / len(humidity_values) if humidity_values else None
         occupied = any(
             (state := self.hass.states.get(eid)) is not None and state.state == "on"
             for eid in average.get("occupancy_entities", [])
@@ -677,6 +695,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             "cooling_allowed": plan.cooling_allowed,
             "ventilation_allowed": plan.ventilation_allowed,
             "current_temperature": indoor_temperature,
+            "current_humidity": indoor_humidity,
             "target_temperature": config.cooling_target,
             "fan_speed": plan.fan_speed,
             "home_occupied": home_occupied,

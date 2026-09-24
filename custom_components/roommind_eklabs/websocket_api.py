@@ -833,7 +833,10 @@ async def websocket_get_settings(
             vol.Optional("temperature_offsets", default={}): {
                 str: vol.All(vol.Coerce(float), vol.Range(min=-20, max=20))
             },
-            vol.Optional("humidity_sensor", default=""): str,
+            vol.Optional("humidity_sensors", default=[]): [str],
+            vol.Optional("humidity_offsets", default={}): {
+                str: vol.All(vol.Coerce(float), vol.Range(min=-50, max=50))
+            },
             vol.Optional("home_presence_entities", default=[]): [str],
             vol.Optional("occupancy_entities", default=[]): [str],
             vol.Optional("media_player_entities", default=[]): [str],
