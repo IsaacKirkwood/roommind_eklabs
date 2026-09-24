@@ -71,6 +71,11 @@ from .managers.residual_heat_tracker import ResidualHeatTracker
 from .managers.shared_heat_source_manager import RoomHeatDemand, SharedHeatSourceManager
 from .managers.valve_manager import ValveManager
 from .managers.weather_manager import WeatherManager
+from .managers.whole_house_mpc import (
+    WHOLE_HOUSE_MODEL_ID,
+    WholeHouseMpcAdvice,
+    get_whole_house_mpc_advice,
+)
 from .managers.whole_house_plant_manager import (
     MODE_OFF as PLANT_MODE_OFF,
 )
@@ -195,6 +200,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         self._whole_house_plant_manager: WholeHousePlantManager | None = None
         self._whole_house_plant_entity = ""
         self._whole_house_plant_live: dict[str, Any] = {}
+        self._whole_house_mpc_advice: WholeHouseMpcAdvice | None = None
         # Track which rooms already have entity platform entities registered
         self._entity_areas: set[str] = set()
         # Min-run enforcement: timestamp when current non-idle mode started
@@ -304,7 +310,10 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             except Exception:  # noqa: BLE001
                 _LOGGER.exception("Room '%s': processing failed, skipping", area_id)
 
-        await self._async_control_shared_heat_sources(room_states)
+        whole_house_temperature = self._read_whole_house_temperature(room_states, settings)
+        self._update_whole_house_model(whole_house_temperature, settings)
+
+        await self._async_control_shared_heat_sources(room_states, settings)
 
         # The central MagIQtouch unit is one whole-house evaporative zone.
         # Evaluate it after gas heat so the heat/cool interlock uses live state.
@@ -435,6 +444,103 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             "whole_house_plant": self._whole_house_plant_live,
         }
 
+    def _read_whole_house_temperature(self, room_states: dict[str, dict], settings: dict) -> float | None:
+        """Return the corrected average used by the central plant and its model."""
+        raw = settings.get("whole_house_plant") or {}
+        temperatures: list[float] = []
+        offsets = raw.get("temperature_offsets", {})
+        for sensor_id in raw.get("temperature_sensors", []):
+            value = read_sensor_value(self.hass, sensor_id, "whole_house_plant", "temperature")
+            if value is not None:
+                temperatures.append(
+                    ha_temp_to_celsius(self.hass, value, entity_id=sensor_id)
+                    + float(offsets.get(sensor_id, 0.0))
+                )
+        if not temperatures:
+            temperatures = [
+                state["current_temp"]
+                for state in room_states.values()
+                if isinstance(state.get("current_temp"), (int, float))
+            ]
+        return sum(temperatures) / len(temperatures) if temperatures else None
+
+    def _update_whole_house_model(self, temperature: float | None, settings: dict) -> None:
+        """Train the isolated house model from the previously observed plant state."""
+        raw = settings.get("whole_house_plant") or {}
+        if not raw.get("mpc_enabled", True):
+            self._ekf_training.clear(WHOLE_HOUSE_MODEL_ID)
+            existing = get_whole_house_mpc_advice(
+                self._model_manager, temperature, self.outdoor_temp_effective
+            )
+            self._whole_house_mpc_advice = WholeHouseMpcAdvice(
+                existing.predicted_temperature,
+                False,
+                False,
+                existing.confidence,
+                existing.n_idle,
+                existing.n_heating,
+                existing.n_cooling,
+            )
+            return
+        central_plant_configured = raw.get("enabled", False) or any(
+            source.get("enabled", True) for source in settings.get("shared_heat_sources", [])
+        )
+        if temperature is None or self.outdoor_temp_effective is None or not central_plant_configured:
+            self._ekf_training.clear(WHOLE_HOUSE_MODEL_ID)
+            self._whole_house_mpc_advice = get_whole_house_mpc_advice(
+                self._model_manager, temperature, self.outdoor_temp_effective
+            )
+            return
+
+        heating_active = any(bool(plan.get("active")) for plan in self._shared_heat_plans)
+        if not heating_active:
+            heating_active = any(
+                (state := self.hass.states.get(str(source.get("entity_id", "")))) is not None
+                and state.state in {"on", "heat", "heating"}
+                for source in settings.get("shared_heat_sources", [])
+            )
+        entity_id = str(raw.get("entity_id", ""))
+        plant_state = self.hass.states.get(entity_id) if entity_id else None
+        plant_mode = plant_state.state if plant_state is not None else PLANT_MODE_OFF
+        if heating_active and plant_mode == "cool":
+            training_mode = None
+            power_fraction = 0.0
+        elif heating_active:
+            training_mode = MODE_HEATING
+            power_fraction = 1.0
+        elif plant_mode == "cool":
+            training_mode = MODE_COOLING
+            try:
+                power_fraction = min(1.0, max(0.1, float(plant_state.attributes.get("fan_mode", 10)) / 10.0))
+            except (TypeError, ValueError):
+                power_fraction = 1.0
+        elif plant_mode == PLANT_MODE_OFF:
+            training_mode = MODE_IDLE
+            power_fraction = 0.0
+        else:
+            # Fresh-air mode exchanges outdoor air and is not valid idle/cooling training data.
+            training_mode = None
+            power_fraction = 0.0
+
+        self._ekf_training.process(
+            area_id=WHOLE_HOUSE_MODEL_ID,
+            current_temp=temperature,
+            T_outdoor=self.outdoor_temp_effective,
+            ekf_mode=training_mode,
+            ekf_pf=power_fraction,
+            window_open=False,
+            raw_open=False,
+            q_residual=0.0,
+            shading_factor=1.0,
+            q_solar=self._current_q_solar,
+            can_heat=True,
+            can_cool=True,
+            dt_minutes=UPDATE_INTERVAL / 60.0,
+        )
+        self._whole_house_mpc_advice = get_whole_house_mpc_advice(
+            self._model_manager, temperature, self.outdoor_temp_effective
+        )
+
     async def _async_control_whole_house_plant(self, room_states: dict[str, dict], settings: dict) -> None:
         """Control a single-zone whole-house evaporative cooler/fresh-air plant."""
         raw = settings.get("whole_house_plant") or {}
@@ -489,21 +595,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         else:
             self._whole_house_plant_manager.config = config
 
-        temperatures: list[float] = []
-        offsets = raw.get("temperature_offsets", {})
-        for sensor_id in raw.get("temperature_sensors", []):
-            value = read_sensor_value(self.hass, sensor_id, "whole_house_plant", "temperature")
-            if value is not None:
-                temperatures.append(
-                    ha_temp_to_celsius(self.hass, value, entity_id=sensor_id) + float(offsets.get(sensor_id, 0.0))
-                )
-        if not temperatures:
-            temperatures = [
-                state["current_temp"]
-                for state in room_states.values()
-                if isinstance(state.get("current_temp"), (int, float))
-            ]
-        indoor_temperature = sum(temperatures) / len(temperatures) if temperatures else None
+        indoor_temperature = self._read_whole_house_temperature(room_states, settings)
         indoor_humidity = read_sensor_value(
             self.hass, raw.get("indoor_humidity_sensor"), "whole_house_plant", "humidity"
         )
@@ -540,6 +632,14 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             reported_mode=plant_state.state if plant_state is not None else None,
             feedback_available=feedback_available,
             feedback_age_seconds=age,
+            predicted_temperature=(
+                self._whole_house_mpc_advice.predicted_temperature
+                if self._whole_house_mpc_advice is not None
+                else None
+            ),
+            mpc_cooling_active=bool(
+                self._whole_house_mpc_advice and self._whole_house_mpc_advice.cooling_ready
+            ),
         )
         self._whole_house_plant_live = {
             "configured": True,
@@ -554,6 +654,25 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             "fan_speed": plan.fan_speed,
             "home_occupied": home_occupied,
             "occupied": occupied,
+            "predicted_temperature": (
+                self._whole_house_mpc_advice.predicted_temperature
+                if self._whole_house_mpc_advice is not None
+                else None
+            ),
+            "mpc_heating_active": bool(
+                self._whole_house_mpc_advice and self._whole_house_mpc_advice.heating_ready
+            ),
+            "mpc_cooling_active": bool(
+                self._whole_house_mpc_advice and self._whole_house_mpc_advice.cooling_ready
+            ),
+            "mpc_confidence": (
+                self._whole_house_mpc_advice.confidence if self._whole_house_mpc_advice else 0.0
+            ),
+            "mpc_samples": {
+                "idle": self._whole_house_mpc_advice.n_idle if self._whole_house_mpc_advice else 0,
+                "heating": self._whole_house_mpc_advice.n_heating if self._whole_house_mpc_advice else 0,
+                "cooling": self._whole_house_mpc_advice.n_cooling if self._whole_house_mpc_advice else 0,
+            },
         }
         for room_state in room_states.values():
             room_state["shared_cooling_active"] = plan.mode == "cool"
@@ -581,8 +700,11 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             except Exception:  # noqa: BLE001
                 _LOGGER.exception("Whole-house plant fan command failed for '%s'", entity_id)
 
-    async def _async_control_shared_heat_sources(self, room_states: dict[str, dict]) -> None:
+    async def _async_control_shared_heat_sources(
+        self, room_states: dict[str, dict], settings: dict | None = None
+    ) -> None:
         """Evaluate aggregate room demand and command whole-house heat sources."""
+        settings = settings or {}
         demands = [
             RoomHeatDemand(
                 area_id=area_id,
@@ -616,6 +738,31 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                     if area_id in room_states and isinstance(room_states[area_id].get("current_temp"), (int, float))
                 ]
             shared_current_temp = sum(source_temperatures) / len(source_temperatures) if source_temperatures else None
+            plant_settings = settings.get("whole_house_plant") or {}
+            if plant_settings.get("temperature_sensors"):
+                canonical_temperature = self._read_whole_house_temperature(room_states, settings)
+                if canonical_temperature is not None:
+                    shared_current_temp = canonical_temperature
+            mpc_heating_active = bool(
+                self._whole_house_mpc_advice and self._whole_house_mpc_advice.heating_ready
+            )
+            predicted_temperature = (
+                self._whole_house_mpc_advice.predicted_temperature
+                if self._whole_house_mpc_advice is not None
+                else None
+            )
+            control_temperature = shared_current_temp
+            source_was_active = any(
+                plan.get("id") == source_id and bool(plan.get("active"))
+                for plan in self._shared_heat_plans
+            )
+            if (
+                mpc_heating_active
+                and not source_was_active
+                and shared_current_temp is not None
+                and predicted_temperature is not None
+            ):
+                control_temperature = min(shared_current_temp, predicted_temperature)
             occupied_now = any(
                 (state := self.hass.states.get(entity_id)) is not None and state.state == "on"
                 for entity_id in config.occupancy_entities
@@ -638,7 +785,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                 source_id,
                 demands,
                 occupied_now=occupied_now,
-                shared_current_temp=shared_current_temp,
+                shared_current_temp=control_temperature,
                 home_occupied=home_occupied,
                 scheduled_preset=scheduled_preset,
             )
@@ -656,6 +803,13 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                     "max_delta": plan.max_delta,
                     "occupancy_eligible": plan.occupancy_eligible,
                     "current_temperature": shared_current_temp,
+                    "predicted_temperature": predicted_temperature,
+                    "mpc_active": mpc_heating_active,
+                    "mpc_confidence": (
+                        self._whole_house_mpc_advice.confidence
+                        if self._whole_house_mpc_advice is not None
+                        else 0.0
+                    ),
                     "target_temperature": (
                         config.eco_temperature
                         if (scheduled_preset or config.preset_mode) == "eco"

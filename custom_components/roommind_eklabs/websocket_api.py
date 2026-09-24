@@ -786,6 +786,7 @@ async def websocket_get_settings(
             vol.Optional("operating_mode", default="auto"): vol.In(
                 ["auto", "off", "cool", "fan_only"]
             ),
+            vol.Optional("mpc_enabled", default=True): bool,
             vol.Optional("cooling_target", default=24.0): vol.All(vol.Coerce(float), vol.Range(min=16, max=35)),
             vol.Optional("cooling_start_delta", default=0.5): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=5)),
             vol.Optional("cooling_stop_delta", default=0.2): vol.All(vol.Coerce(float), vol.Range(min=0, max=5)),

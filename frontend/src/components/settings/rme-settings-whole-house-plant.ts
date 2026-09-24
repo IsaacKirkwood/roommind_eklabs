@@ -55,6 +55,12 @@ export class RmeSettingsWholeHousePlant extends LitElement {
           @change=${(e: Event) => this._set("enabled", (e.target as HTMLInputElement).checked)}
         ></ha-checkbox>
       </ha-formfield>
+      <ha-formfield label="Enable whole-house MPC learning">
+        <ha-checkbox
+          .checked=${p.mpc_enabled}
+          @change=${(e: Event) => this._set("mpc_enabled", (e.target as HTMLInputElement).checked)}
+        ></ha-checkbox>
+      </ha-formfield>
       <div>
         <ha-entity-picker
           .hass=${this.hass}

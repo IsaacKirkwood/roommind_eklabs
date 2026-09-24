@@ -75,6 +75,7 @@ export class RsSettings extends LitElement {
     enabled: false,
     entity_id: "",
     operating_mode: "auto",
+    mpc_enabled: true,
     cooling_target: 24,
     cooling_start_delta: 0.5,
     cooling_stop_delta: 0.2,

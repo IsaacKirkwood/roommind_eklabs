@@ -183,6 +183,14 @@ export class RmeWholeHouseCard extends LitElement {
         : plantLive?.mode === "fan_only"
           ? "Fresh air"
           : "Ready";
+    const mpcActive = Boolean(
+      live?.mpc_active || plantLive?.mpc_heating_active || plantLive?.mpc_cooling_active,
+    );
+    const mpcStatus = !plant?.mpc_enabled
+      ? "MPC off"
+      : mpcActive
+        ? "MPC active"
+        : `MPC learning ${Math.round((plantLive?.mpc_confidence ?? live?.mpc_confidence ?? 0) * 100)}%`;
     return html`
       <ha-card class=${enabled || plantEnabled ? "" : "off"}>
         <div class="top">
@@ -191,7 +199,7 @@ export class RmeWholeHouseCard extends LitElement {
             <div>
               <h3>Whole House</h3>
               <div class="status">
-                ${overallStatus}
+                ${overallStatus} · ${mpcStatus}
                 ${
                   scheduled
                     ? ` · Schedule ${effectivePreset === "eco" ? "Eco" : "Comfort"}`

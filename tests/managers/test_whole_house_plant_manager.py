@@ -168,3 +168,35 @@ def test_safety_gate_overrides_minimum_run():
     _evaluate(manager, now=1000)
     plan = _evaluate(manager, reported_mode=MODE_COOL, home_occupied=False, now=1100)
     assert plan.mode == MODE_OFF
+
+
+def test_mpc_forecast_can_start_cooling_before_threshold():
+    manager = WholeHousePlantManager(WholeHousePlantConfig("climate.plant", cooling_target=24.0))
+    fallback = _evaluate(manager, indoor_temperature=24.2, predicted_temperature=25.0)
+    assert fallback.mode == MODE_OFF
+
+    manager = WholeHousePlantManager(manager.config)
+    predictive = _evaluate(
+        manager,
+        indoor_temperature=24.2,
+        predicted_temperature=25.0,
+        mpc_cooling_active=True,
+    )
+    assert predictive.mode == MODE_COOL
+    assert predictive.fan_speed > manager.config.cooling_fan_min_speed
+
+
+def test_running_cooling_stops_from_measurement_not_idle_forecast():
+    manager = WholeHousePlantManager(
+        WholeHousePlantConfig("climate.plant", cooling_target=24.0, minimum_cooling_run_minutes=0)
+    )
+    _evaluate(manager, indoor_temperature=26.0, now=1000)
+    stopped = _evaluate(
+        manager,
+        indoor_temperature=24.1,
+        predicted_temperature=26.0,
+        mpc_cooling_active=True,
+        reported_mode=MODE_COOL,
+        now=1100,
+    )
+    assert stopped.mode == MODE_OFF

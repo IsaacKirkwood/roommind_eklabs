@@ -102,6 +102,8 @@ class WholeHousePlantManager:
         reported_mode: str | None,
         feedback_available: bool,
         feedback_age_seconds: float,
+        predicted_temperature: float | None = None,
+        mpc_cooling_active: bool = False,
         now: float | None = None,
     ) -> WholeHousePlantPlan:
         """Return the next safe operating mode."""
@@ -144,10 +146,15 @@ class WholeHousePlantManager:
             else:
                 reason = cooling_reason
         elif cooling_allowed and indoor_temperature is not None:
+            start_temperature = (
+                max(indoor_temperature, predicted_temperature)
+                if mpc_cooling_active and predicted_temperature is not None
+                else indoor_temperature
+            )
             if self.state.commanded_mode == MODE_COOL:
                 cooling_demand = indoor_temperature > self.config.cooling_target + self.config.cooling_stop_delta
             else:
-                cooling_demand = indoor_temperature >= self.config.cooling_target + self.config.cooling_start_delta
+                cooling_demand = start_temperature >= self.config.cooling_target + self.config.cooling_start_delta
             if cooling_demand:
                 desired = MODE_COOL
                 reason = "whole-house cooling demand"
@@ -162,7 +169,17 @@ class WholeHousePlantManager:
         else:
             reason = cooling_reason
 
-        fan_speed = self._fan_speed(desired, indoor_temperature)
+        fan_temperature = (
+            max(indoor_temperature, predicted_temperature)
+            if (
+                indoor_temperature is not None
+                and self.state.commanded_mode != MODE_COOL
+                and mpc_cooling_active
+                and predicted_temperature is not None
+            )
+            else indoor_temperature
+        )
+        fan_speed = self._fan_speed(desired, fan_temperature)
         transition = desired != self.state.commanded_mode
         fan_speed_changed = desired != MODE_OFF and fan_speed != self.state.commanded_fan_speed
         if transition:

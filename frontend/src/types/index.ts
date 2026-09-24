@@ -143,12 +143,16 @@ export interface SharedHeatSourceLive {
   home_occupied: boolean;
   preset_mode?: "comfort" | "eco";
   schedule_active?: boolean | null;
+  predicted_temperature?: number | null;
+  mpc_active?: boolean;
+  mpc_confidence?: number;
 }
 
 export interface WholeHousePlant {
   enabled: boolean;
   entity_id: string;
   operating_mode: "auto" | "off" | "cool" | "fan_only";
+  mpc_enabled: boolean;
   cooling_target: number;
   cooling_start_delta: number;
   cooling_stop_delta: number;
@@ -179,6 +183,11 @@ export interface WholeHousePlant {
     current_temperature?: number | null;
     cooling_allowed?: boolean;
     fan_speed?: number | null;
+    predicted_temperature?: number | null;
+    mpc_heating_active?: boolean;
+    mpc_cooling_active?: boolean;
+    mpc_confidence?: number;
+    mpc_samples?: { idle: number; heating: number; cooling: number };
   };
 }
 
