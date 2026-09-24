@@ -181,12 +181,16 @@ export interface WholeHousePlant {
   ventilation_request_entities: string[];
   exhaust_ready_entities: string[];
   outdoor_air_lockout_entities: string[];
+  outdoor_air_quality_entity: string;
+  outdoor_air_quality_max_aqi: number;
   live?: {
     mode?: "off" | "cool" | "fan_only";
     reason?: string;
     fault?: string | null;
     current_temperature?: number | null;
     current_humidity?: number | null;
+    outdoor_aqi?: number | null;
+    outdoor_air_safe?: boolean;
     cooling_allowed?: boolean;
     fan_speed?: number | null;
     predicted_temperature?: number | null;

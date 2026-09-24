@@ -115,6 +115,8 @@ export class RsSettings extends LitElement {
     ventilation_request_entities: [],
     exhaust_ready_entities: [],
     outdoor_air_lockout_entities: [],
+    outdoor_air_quality_entity: "",
+    outdoor_air_quality_max_aqi: 100,
   };
   @state() private _coilDryEnabled = false;
   @state() private _coilDryMinutes = 20;

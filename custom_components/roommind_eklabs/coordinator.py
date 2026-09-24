@@ -665,6 +665,19 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             (state := self.hass.states.get(eid)) is not None and state.state == "on"
             for eid in raw.get("outdoor_air_lockout_entities", [])
         )
+        outdoor_aqi: float | None = None
+        outdoor_aqi_entity = raw.get("outdoor_air_quality_entity", "")
+        if outdoor_aqi_entity:
+            outdoor_aqi = read_sensor_value(
+                self.hass,
+                outdoor_aqi_entity,
+                "whole_house_plant",
+                "outdoor air quality",
+            )
+            if outdoor_aqi is not None:
+                outdoor_air_safe = outdoor_air_safe and outdoor_aqi <= float(
+                    raw.get("outdoor_air_quality_max_aqi", 100.0)
+                )
         plant_state = self.hass.states.get(entity_id)
         feedback_available = plant_state is not None and plant_state.state not in {"unavailable", "unknown"}
         age = max(0.0, time.time() - plant_state.last_updated.timestamp()) if plant_state is not None else float("inf")
@@ -702,6 +715,8 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             "ventilation_allowed": plan.ventilation_allowed,
             "current_temperature": indoor_temperature,
             "current_humidity": indoor_humidity,
+            "outdoor_aqi": outdoor_aqi,
+            "outdoor_air_safe": outdoor_air_safe,
             "target_temperature": config.cooling_target,
             "fan_speed": plan.fan_speed,
             "home_occupied": home_occupied,

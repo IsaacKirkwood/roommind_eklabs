@@ -835,6 +835,10 @@ async def websocket_get_settings(
             vol.Optional("ventilation_request_entities", default=[]): [str],
             vol.Optional("exhaust_ready_entities", default=[]): [str],
             vol.Optional("outdoor_air_lockout_entities", default=[]): [str],
+            vol.Optional("outdoor_air_quality_entity", default=""): str,
+            vol.Optional("outdoor_air_quality_max_aqi", default=100.0): vol.All(
+                vol.Coerce(float), vol.Range(min=0, max=500)
+            ),
         },
         vol.Optional("whole_house_average"): {
             vol.Optional("temperature_sensors", default=[]): [str],

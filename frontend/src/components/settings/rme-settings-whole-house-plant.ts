@@ -107,6 +107,19 @@ export class RmeSettingsWholeHousePlant extends LitElement {
       ></ha-formfield>
       ${this._picker("Add exhaust-ready sensor", "exhaust_ready_entities", ["binary_sensor", "input_boolean"])}
       ${this._picker("Add outdoor-air lockout", "outdoor_air_lockout_entities", ["binary_sensor", "input_boolean"])}
+      <div>
+        <ha-entity-picker
+          .hass=${this.hass}
+          .value=${p.outdoor_air_quality_entity}
+          .includeDomains=${["sensor"]}
+          label="Outdoor AQI sensor"
+          allow-custom-entity
+          @value-changed=${(e: CustomEvent) =>
+            this._set("outdoor_air_quality_entity", e.detail?.value ?? "")}
+        ></ha-entity-picker>
+        <div class="hint">Use the nearest reliable outdoor station, such as EPA Macleod hourly overall AQI.</div>
+      </div>
+      ${this._number("Maximum safe outdoor AQI", "outdoor_air_quality_max_aqi", "AQI", 0, 500, 1)}
       ${this._picker("Add fresh-air request", "ventilation_request_entities", ["binary_sensor", "input_boolean"])}
       <div class="wide hint">
         Temperature, humidity, and presence come from House averages. Cooling is blocked while gas
