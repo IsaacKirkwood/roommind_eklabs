@@ -328,6 +328,7 @@ async def websocket_list_rooms(
             "rooms": result,
             "outdoor_temp": coordinator.outdoor_temp_effective if coordinator else None,
             "outdoor_humidity": coordinator.outdoor_humidity if coordinator else None,
+            "outdoor_humidity_source": getattr(coordinator, "outdoor_humidity_source", "none"),
             "vacation_active": vacation_active,
             "vacation_temp": settings.get("vacation_temp") if vacation_active else None,
             "vacation_until": vacation_until if vacation_active else None,

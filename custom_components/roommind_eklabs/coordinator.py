@@ -160,6 +160,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         self.outdoor_temp_effective: float | None = None
         self.outdoor_temp_source: str = "none"
         self.outdoor_humidity: float | None = None
+        self.outdoor_humidity_source: str = "none"
         self._outdoor_unavailable_cycles: int = 0
         self._outdoor_warning_sent: bool = False
         self._window_manager = WindowManager()
@@ -252,9 +253,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         self.outdoor_temp = (
             ha_temp_to_celsius(self.hass, raw_outdoor, entity_id=outdoor_sensor_id) if raw_outdoor is not None else None
         )
-        self.outdoor_humidity = read_sensor_value(
-            self.hass, settings.get("outdoor_humidity_sensor"), "global", "outdoor humidity"
-        )
+        self.outdoor_humidity, self.outdoor_humidity_source = self._resolve_outdoor_humidity(settings)
 
         # Effective outdoor temperature: sensor → weather entity → none.
         # The EKF must not train with a degenerate fallback (e.g. room temp);
@@ -997,6 +996,34 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                     converted = ha_temp_to_celsius(self.hass, float(temp_attr), entity_id=weather_eid)
                     if converted is not None:
                         return converted, "weather"
+
+        return None, "none"
+
+    def _resolve_outdoor_humidity(self, settings: dict) -> tuple[float | None, str]:
+        """Return outdoor relative humidity and its source.
+
+        A dedicated sensor remains authoritative. When it is missing or
+        unavailable, use the standard humidity attribute exposed by the
+        configured weather entity (for example a BOM-backed weather entity).
+        """
+        sensor_value = read_sensor_value(
+            self.hass,
+            settings.get("outdoor_humidity_sensor"),
+            "global",
+            "outdoor humidity",
+        )
+        if sensor_value is not None and 0 <= sensor_value <= 100:
+            return sensor_value, "sensor"
+
+        weather_eid = settings.get("weather_entity") or ""
+        if weather_eid:
+            state = self.hass.states.get(weather_eid)
+            if state is not None and state.state not in ("unavailable", "unknown"):
+                humidity = state.attributes.get("humidity")
+                if isinstance(humidity, (int, float)) and not isinstance(humidity, bool):
+                    humidity = float(humidity)
+                    if 0 <= humidity <= 100:
+                        return humidity, "weather"
 
         return None, "none"
 

@@ -347,7 +347,7 @@
   "settings.comfort_weight_efficiency": "Effizienz",
   "settings.comfort_weight_hint": "Gewichtet Temperaturgenauigkeit gegen Energieverbrauch. Komfort reagiert früher und bleibt näher am Zielwert. Effizienz erlaubt mehr Abweichung, um Heiz- und Kühllaufzeiten zu reduzieren.",
   "settings.weather_entity": "Wettervorhersage",
-  "settings.weather_entity_hint": "Optional: ermöglicht vorausschauende Außentemperaturplanung und dient als Fallback wenn der Außensensor nicht verfügbar ist",
+  "settings.weather_entity_hint": "Optional: liefert Wettervorhersagen sowie Außenlufttemperatur und -feuchtigkeit, wenn eigene Sensoren nicht verfügbar sind",
   "settings.outdoor_unavailable_notify": "Hinweis bei fehlender Außentemperatur",
   "settings.outdoor_unavailable_notify_hint": "Zeigt eine Home-Assistant-Benachrichtigung, wenn weder Außensensor noch Wetter-Entity 30 Minuten lang eine Temperatur geliefert haben. In dieser Zeit pausiert RoomMind das Lernen des thermischen Modells, um Korruption zu vermeiden.",
   "settings.prediction_enabled": "Temperaturvorhersage",

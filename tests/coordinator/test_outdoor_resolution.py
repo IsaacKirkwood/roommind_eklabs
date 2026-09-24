@@ -147,6 +147,60 @@ async def test_both_none_returns_none(hass, mock_config_entry):
     assert coordinator.outdoor_temp_source == "none"
 
 
+@pytest.mark.asyncio
+async def test_weather_humidity_fallback_when_sensor_missing(hass, mock_config_entry):
+    """A BOM-style weather entity supplies outdoor humidity."""
+    store = _make_store_mock(rooms={"living_room_abc12345": SAMPLE_ROOM})
+    store.get_settings.return_value = _settings_with(
+        outdoor_humidity_sensor="",
+        weather_entity="weather.bom_local",
+    )
+    hass.data = {"roommind_eklabs": {"store": store}}
+
+    def states_get(eid):
+        if eid == "weather.bom_local":
+            state = MagicMock()
+            state.state = "partlycloudy"
+            state.attributes = {"temperature": 18.0, "humidity": 63}
+            return state
+        return make_mock_states_get()(eid)
+
+    hass.states.get = MagicMock(side_effect=states_get)
+    hass.services.async_call = AsyncMock()
+
+    coordinator = _create_coordinator(hass, mock_config_entry)
+    await coordinator._async_update_data()
+
+    assert coordinator.outdoor_humidity == pytest.approx(63.0)
+    assert coordinator.outdoor_humidity_source == "weather"
+
+
+@pytest.mark.asyncio
+async def test_outdoor_humidity_sensor_wins_over_weather(hass, mock_config_entry):
+    """A dedicated outdoor humidity sensor remains the preferred source."""
+    store = _make_store_mock(rooms={"living_room_abc12345": SAMPLE_ROOM})
+    store.get_settings.return_value = _settings_with(
+        outdoor_humidity_sensor="sensor.outdoor_humidity",
+        weather_entity="weather.bom_local",
+    )
+    hass.data = {"roommind_eklabs": {"store": store}}
+
+    def states_get(eid):
+        state = MagicMock()
+        state.state = "48" if eid == "sensor.outdoor_humidity" else "partlycloudy"
+        state.attributes = {} if eid == "sensor.outdoor_humidity" else {"temperature": 18.0, "humidity": 63}
+        return state
+
+    hass.states.get = MagicMock(side_effect=states_get)
+    hass.services.async_call = AsyncMock()
+
+    coordinator = _create_coordinator(hass, mock_config_entry)
+    await coordinator._async_update_data()
+
+    assert coordinator.outdoor_humidity == pytest.approx(48.0)
+    assert coordinator.outdoor_humidity_source == "sensor"
+
+
 # ---------------------------------------------------------------------------
 # EKF training gate
 # ---------------------------------------------------------------------------

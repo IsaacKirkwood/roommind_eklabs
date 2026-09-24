@@ -268,6 +268,7 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, config_entry: 
     outdoor: dict[str, Any] = {
         "temp": coordinator.outdoor_temp if coordinator else None,
         "humidity": coordinator.outdoor_humidity if coordinator else None,
+        "humidity_source": getattr(coordinator, "outdoor_humidity_source", "none"),
     }
     if coordinator:
         forecast = coordinator._weather_manager._outdoor_forecast
