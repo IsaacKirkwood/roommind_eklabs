@@ -79,8 +79,8 @@ export class RmeSettingsWholeHousePlant extends LitElement {
       ${this._number("Minimum outdoor temperature", "minimum_outdoor_cooling_temp", "°C", 0, 40, 0.5)}
       ${this._number("Maximum outdoor humidity", "evaporative_max_outdoor_humidity", "%", 10, 100, 1)}
       ${this._number("Minimum indoor/outdoor advantage", "evaporative_min_indoor_outdoor_delta", "°C", 0, 15, 0.5)}
-      ${this._number("Minimum cooling run", "minimum_cooling_run_minutes", "min", 0, 120, 5)}
-      ${this._number("Minimum fresh-air run", "minimum_ventilation_run_minutes", "min", 0, 120, 5)}
+      ${this._number("Minimum evaporative cooling run", "minimum_cooling_run_minutes", "min", 0, 120, 5)}
+      ${this._number("Minimum fan-only run", "minimum_ventilation_run_minutes", "min", 0, 120, 5)}
       ${this._number("Cooling minimum fan speed", "cooling_fan_min_speed", "/ 10", 1, 10, 1)}
       ${this._number("Cooling maximum fan speed", "cooling_fan_max_speed", "/ 10", 1, 10, 1)}
       ${this._number("Fresh-air fan speed", "ventilation_fan_speed", "/ 10", 1, 10, 1)}
@@ -97,6 +97,13 @@ export class RmeSettingsWholeHousePlant extends LitElement {
           @change=${(e: Event) => this._set("require_occupancy", (e.target as HTMLInputElement).checked)}
         ></ha-checkbox
       ></ha-formfield>
+      <ha-formfield label="Require an open exhaust path"
+        ><ha-checkbox
+          .checked=${p.require_exhaust_ready}
+          @change=${(e: Event) => this._set("require_exhaust_ready", (e.target as HTMLInputElement).checked)}
+        ></ha-checkbox
+      ></ha-formfield>
+      ${this._picker("Add exhaust-ready sensor", "exhaust_ready_entities", ["binary_sensor", "input_boolean"])}
       ${this._picker("Add fresh-air request", "ventilation_request_entities", ["binary_sensor", "input_boolean"])}
       <div class="wide hint">
         Temperature, humidity, and presence come from House averages. Cooling is blocked while gas
@@ -131,7 +138,8 @@ export class RmeSettingsWholeHousePlant extends LitElement {
       | "home_presence_entities"
       | "occupancy_entities"
       | "media_player_entities"
-      | "ventilation_request_entities",
+      | "ventilation_request_entities"
+      | "exhaust_ready_entities",
     domains: string[],
   ) {
     const entities = this.plant[key] ?? [];

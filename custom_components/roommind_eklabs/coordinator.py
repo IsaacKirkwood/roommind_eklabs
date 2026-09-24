@@ -606,6 +606,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             stale_after_seconds=int(raw.get("stale_after_seconds", 180)),
             require_home_presence=bool(raw.get("require_home_presence", True)),
             require_occupancy=bool(raw.get("require_occupancy", True)),
+            require_exhaust_ready=bool(raw.get("require_exhaust_ready", False)),
         )
         if self._whole_house_plant_manager is None or self._whole_house_plant_entity != entity_id:
             self._whole_house_plant_manager = WholeHousePlantManager(config)
@@ -635,6 +636,12 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             (state := self.hass.states.get(eid)) is not None and state.state == "on"
             for eid in raw.get("ventilation_request_entities", [])
         )
+        exhaust_entities = raw.get("exhaust_ready_entities", [])
+        exhaust_ready = any(
+            (state := self.hass.states.get(eid)) is not None
+            and state.state in {"on", "open"}
+            for eid in exhaust_entities
+        )
         plant_state = self.hass.states.get(entity_id)
         feedback_available = plant_state is not None and plant_state.state not in {"unavailable", "unknown"}
         age = max(0.0, time.time() - plant_state.last_updated.timestamp()) if plant_state is not None else float("inf")
@@ -647,6 +654,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             home_occupied=home_occupied,
             area_occupied=occupied,
             heating_active=heating_active,
+            exhaust_ready=exhaust_ready,
             ventilation_requested=ventilation_requested,
             reported_mode=plant_state.state if plant_state is not None else None,
             feedback_available=feedback_available,

@@ -102,6 +102,7 @@ export class RsSettings extends LitElement {
     stale_after_seconds: 180,
     require_home_presence: true,
     require_occupancy: true,
+    require_exhaust_ready: false,
     temperature_sensors: [],
     temperature_offsets: {},
     indoor_humidity_sensor: "",
@@ -109,6 +110,7 @@ export class RsSettings extends LitElement {
     occupancy_entities: [],
     media_player_entities: [],
     ventilation_request_entities: [],
+    exhaust_ready_entities: [],
   };
   @state() private _coilDryEnabled = false;
   @state() private _coilDryMinutes = 20;

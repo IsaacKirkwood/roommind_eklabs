@@ -55,6 +55,7 @@ class WholeHousePlantConfig:
     stale_after_seconds: int = 180
     require_home_presence: bool = True
     require_occupancy: bool = True
+    require_exhaust_ready: bool = False
 
 
 @dataclass
@@ -98,6 +99,7 @@ class WholeHousePlantManager:
         home_occupied: bool,
         area_occupied: bool,
         heating_active: bool,
+        exhaust_ready: bool,
         ventilation_requested: bool,
         reported_mode: str | None,
         feedback_available: bool,
@@ -109,16 +111,17 @@ class WholeHousePlantManager:
         """Return the next safe operating mode."""
         timestamp = monotonic() if now is None else now
         fault = self._feedback_fault(timestamp, reported_mode, feedback_available, feedback_age_seconds)
-        eligible = (not self.config.require_home_presence or home_occupied) and (
+        occupied_eligible = (not self.config.require_home_presence or home_occupied) and (
             not self.config.require_occupancy or area_occupied
         )
+        exhaust_eligible = not self.config.require_exhaust_ready or exhaust_ready
         cooling_allowed, cooling_reason = self._cooling_allowed(
             indoor_temperature,
             indoor_humidity,
             outdoor_temperature,
             outdoor_humidity,
         )
-        ventilation_allowed = eligible and feedback_available and not fault
+        ventilation_allowed = occupied_eligible and exhaust_eligible and feedback_available and not fault
 
         desired = MODE_OFF
         reason = "idle"
@@ -126,8 +129,10 @@ class WholeHousePlantManager:
             reason = fault
         elif heating_active:
             reason = "heating interlock"
-        elif not eligible:
+        elif not occupied_eligible:
             reason = "occupancy gate clear"
+        elif not exhaust_eligible:
+            reason = "open an exhaust path"
         elif self._runtime_exceeded(timestamp):
             fault = "maximum runtime exceeded"
             reason = fault

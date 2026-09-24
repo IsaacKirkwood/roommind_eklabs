@@ -169,6 +169,7 @@ export interface WholeHousePlant {
   stale_after_seconds: number;
   require_home_presence: boolean;
   require_occupancy: boolean;
+  require_exhaust_ready: boolean;
   temperature_sensors: string[];
   temperature_offsets: Record<string, number>;
   indoor_humidity_sensor: string;
@@ -176,6 +177,7 @@ export interface WholeHousePlant {
   occupancy_entities: string[];
   media_player_entities: string[];
   ventilation_request_entities: string[];
+  exhaust_ready_entities: string[];
   live?: {
     mode?: "off" | "cool" | "fan_only";
     reason?: string;

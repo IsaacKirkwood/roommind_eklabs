@@ -20,6 +20,7 @@ def _evaluate(manager, **overrides):
         "home_occupied": True,
         "area_occupied": True,
         "heating_active": False,
+        "exhaust_ready": True,
         "ventilation_requested": False,
         "reported_mode": MODE_OFF,
         "feedback_available": True,
@@ -168,6 +169,19 @@ def test_safety_gate_overrides_minimum_run():
     _evaluate(manager, now=1000)
     plan = _evaluate(manager, reported_mode=MODE_COOL, home_occupied=False, now=1100)
     assert plan.mode == MODE_OFF
+
+
+def test_evaporative_cooling_can_require_an_exhaust_path():
+    manager = WholeHousePlantManager(
+        WholeHousePlantConfig("climate.plant", require_exhaust_ready=True)
+    )
+    blocked = _evaluate(manager, exhaust_ready=False)
+    assert blocked.mode == MODE_OFF
+    assert blocked.reason == "open an exhaust path"
+
+    manager = WholeHousePlantManager(manager.config)
+    allowed = _evaluate(manager, exhaust_ready=True)
+    assert allowed.mode == MODE_COOL
 
 
 def test_mpc_forecast_can_start_cooling_before_threshold():

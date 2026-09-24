@@ -816,6 +816,7 @@ async def websocket_get_settings(
             vol.Optional("stale_after_seconds", default=180): vol.All(vol.Coerce(int), vol.Range(min=60, max=1800)),
             vol.Optional("require_home_presence", default=True): bool,
             vol.Optional("require_occupancy", default=True): bool,
+            vol.Optional("require_exhaust_ready", default=False): bool,
             vol.Optional("temperature_sensors", default=[]): [str],
             vol.Optional("temperature_offsets", default={}): {
                 str: vol.All(vol.Coerce(float), vol.Range(min=-20, max=20))
@@ -825,6 +826,7 @@ async def websocket_get_settings(
             vol.Optional("occupancy_entities", default=[]): [str],
             vol.Optional("media_player_entities", default=[]): [str],
             vol.Optional("ventilation_request_entities", default=[]): [str],
+            vol.Optional("exhaust_ready_entities", default=[]): [str],
         },
         vol.Optional("whole_house_average"): {
             vol.Optional("temperature_sensors", default=[]): [str],
