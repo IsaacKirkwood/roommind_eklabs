@@ -36,6 +36,7 @@ class WholeHousePlantConfig:
     """Runtime safety and comfort configuration for one central plant."""
 
     entity_id: str
+    operating_mode: str = "auto"
     cooling_type: str = "evaporative"
     cooling_target: float = 24.0
     cooling_start_delta: float = 0.5
@@ -43,6 +44,11 @@ class WholeHousePlantConfig:
     minimum_outdoor_cooling_temp: float = 18.0
     evaporative_max_outdoor_humidity: float = 80.0
     evaporative_min_indoor_outdoor_delta: float = 1.0
+    minimum_cooling_run_minutes: int = 30
+    minimum_ventilation_run_minutes: int = 30
+    cooling_fan_min_speed: int = 4
+    cooling_fan_max_speed: int = 10
+    ventilation_fan_speed: int = 4
     refrigerated_dew_point_margin: float = 2.0
     max_continuous_runtime_minutes: int = 240
     feedback_timeout_seconds: int = 120
@@ -58,6 +64,7 @@ class WholeHousePlantState:
     commanded_mode: str = MODE_OFF
     mode_since: float | None = None
     mismatch_since: float | None = None
+    commanded_fan_speed: int | None = None
 
 
 @dataclass(frozen=True)
@@ -70,6 +77,8 @@ class WholeHousePlantPlan:
     fault: str | None
     cooling_allowed: bool
     ventilation_allowed: bool
+    fan_speed: int | None
+    fan_speed_changed: bool
 
 
 class WholeHousePlantManager:
@@ -120,6 +129,20 @@ class WholeHousePlantManager:
         elif self._runtime_exceeded(timestamp):
             fault = "maximum runtime exceeded"
             reason = fault
+        elif self.config.operating_mode == MODE_OFF:
+            reason = "manually off"
+        elif self._minimum_run_active(timestamp, cooling_allowed):
+            desired = self.state.commanded_mode
+            reason = f"minimum {self._mode_name(desired)} run"
+        elif self.config.operating_mode == MODE_VENTILATE:
+            desired = MODE_VENTILATE
+            reason = "fresh air selected"
+        elif self.config.operating_mode == MODE_COOL:
+            if cooling_allowed:
+                desired = MODE_COOL
+                reason = "cooling selected"
+            else:
+                reason = cooling_reason
         elif cooling_allowed and indoor_temperature is not None:
             if self.state.commanded_mode == MODE_COOL:
                 cooling_demand = indoor_temperature > self.config.cooling_target + self.config.cooling_stop_delta
@@ -139,11 +162,14 @@ class WholeHousePlantManager:
         else:
             reason = cooling_reason
 
+        fan_speed = self._fan_speed(desired, indoor_temperature)
         transition = desired != self.state.commanded_mode
+        fan_speed_changed = desired != MODE_OFF and fan_speed != self.state.commanded_fan_speed
         if transition:
             self.state.commanded_mode = desired
             self.state.mode_since = timestamp if desired != MODE_OFF else None
             self.state.mismatch_since = None
+        self.state.commanded_fan_speed = fan_speed
 
         return WholeHousePlantPlan(
             mode=desired,
@@ -152,7 +178,39 @@ class WholeHousePlantManager:
             fault=fault,
             cooling_allowed=cooling_allowed,
             ventilation_allowed=ventilation_allowed,
+            fan_speed=fan_speed,
+            fan_speed_changed=fan_speed_changed,
         )
+
+    def _minimum_run_active(self, now: float, cooling_allowed: bool) -> bool:
+        """Hold an active mode through its minimum run unless a safety gate opens."""
+        if self.state.mode_since is None:
+            return False
+        if self.state.commanded_mode == MODE_COOL:
+            minimum = self.config.minimum_cooling_run_minutes
+            return cooling_allowed and now - self.state.mode_since < minimum * 60
+        if self.state.commanded_mode == MODE_VENTILATE:
+            minimum = self.config.minimum_ventilation_run_minutes
+            return now - self.state.mode_since < minimum * 60
+        return False
+
+    @staticmethod
+    def _mode_name(mode: str) -> str:
+        return "cooling" if mode == MODE_COOL else "fresh-air"
+
+    def _fan_speed(self, mode: str, indoor_temperature: float | None) -> int | None:
+        """Choose a MagIQtouch manual fan level from 1 to 10."""
+        if mode == MODE_VENTILATE:
+            return min(10, max(1, self.config.ventilation_fan_speed))
+        if mode != MODE_COOL:
+            return None
+        low = min(10, max(1, self.config.cooling_fan_min_speed))
+        high = min(10, max(low, self.config.cooling_fan_max_speed))
+        if indoor_temperature is None or high == low:
+            return low
+        demand = max(0.0, indoor_temperature - self.config.cooling_target - self.config.cooling_start_delta)
+        proportion = min(1.0, demand / 3.5)
+        return round(low + (high - low) * proportion)
 
     def _cooling_allowed(
         self,

@@ -783,6 +783,9 @@ async def websocket_get_settings(
         vol.Optional("whole_house_plant"): {
             vol.Optional("enabled", default=False): bool,
             vol.Optional("entity_id", default=""): str,
+            vol.Optional("operating_mode", default="auto"): vol.In(
+                ["auto", "off", "cool", "fan_only"]
+            ),
             vol.Optional("cooling_target", default=24.0): vol.All(vol.Coerce(float), vol.Range(min=16, max=35)),
             vol.Optional("cooling_start_delta", default=0.5): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=5)),
             vol.Optional("cooling_stop_delta", default=0.2): vol.All(vol.Coerce(float), vol.Range(min=0, max=5)),
@@ -795,6 +798,15 @@ async def websocket_get_settings(
             vol.Optional("evaporative_min_indoor_outdoor_delta", default=1.0): vol.All(
                 vol.Coerce(float), vol.Range(min=0, max=15)
             ),
+            vol.Optional("minimum_cooling_run_minutes", default=30): vol.All(
+                vol.Coerce(int), vol.Range(min=0, max=120)
+            ),
+            vol.Optional("minimum_ventilation_run_minutes", default=30): vol.All(
+                vol.Coerce(int), vol.Range(min=0, max=120)
+            ),
+            vol.Optional("cooling_fan_min_speed", default=4): vol.All(vol.Coerce(int), vol.Range(min=1, max=10)),
+            vol.Optional("cooling_fan_max_speed", default=10): vol.All(vol.Coerce(int), vol.Range(min=1, max=10)),
+            vol.Optional("ventilation_fan_speed", default=4): vol.All(vol.Coerce(int), vol.Range(min=1, max=10)),
             vol.Optional("max_continuous_runtime_minutes", default=240): vol.All(
                 vol.Coerce(int), vol.Range(min=15, max=720)
             ),
@@ -978,6 +990,13 @@ async def websocket_save_settings(
                 msg["id"],
                 "invalid_whole_house_plant_hysteresis",
                 "Cooling stop delta cannot exceed start delta",
+            )
+            return
+        if plant.get("cooling_fan_min_speed", 4) > plant.get("cooling_fan_max_speed", 10):
+            connection.send_error(
+                msg["id"],
+                "invalid_whole_house_plant_fan_range",
+                "Cooling minimum fan speed cannot exceed maximum fan speed",
             )
             return
 

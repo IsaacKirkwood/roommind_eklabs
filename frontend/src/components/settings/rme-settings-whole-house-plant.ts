@@ -73,6 +73,11 @@ export class RmeSettingsWholeHousePlant extends LitElement {
       ${this._number("Minimum outdoor temperature", "minimum_outdoor_cooling_temp", "°C", 0, 40, 0.5)}
       ${this._number("Maximum outdoor humidity", "evaporative_max_outdoor_humidity", "%", 10, 100, 1)}
       ${this._number("Minimum indoor/outdoor advantage", "evaporative_min_indoor_outdoor_delta", "°C", 0, 15, 0.5)}
+      ${this._number("Minimum cooling run", "minimum_cooling_run_minutes", "min", 0, 120, 5)}
+      ${this._number("Minimum fresh-air run", "minimum_ventilation_run_minutes", "min", 0, 120, 5)}
+      ${this._number("Cooling minimum fan speed", "cooling_fan_min_speed", "/ 10", 1, 10, 1)}
+      ${this._number("Cooling maximum fan speed", "cooling_fan_max_speed", "/ 10", 1, 10, 1)}
+      ${this._number("Fresh-air fan speed", "ventilation_fan_speed", "/ 10", 1, 10, 1)}
       ${this._number("Maximum continuous run", "max_continuous_runtime_minutes", "min", 15, 720, 15)}
       <ha-formfield label="Require someone home"
         ><ha-checkbox
@@ -146,9 +151,9 @@ export class RmeSettingsWholeHousePlant extends LitElement {
         .includeDomains=${domains}
         label=${label}
         @value-changed=${(e: CustomEvent) => {
-        const id = e.detail?.value;
-        if (id) this._set(key, [...new Set([...entities, id])]);
-      }}
+          const id = e.detail?.value;
+          if (id) this._set(key, [...new Set([...entities, id])]);
+        }}
       ></ha-entity-picker>
       ${entities.map(
         (id) =>
@@ -158,10 +163,10 @@ export class RmeSettingsWholeHousePlant extends LitElement {
               label="Remove"
               .path=${"M19,13H5V11H19V13Z"}
               @click=${() =>
-          this._set(
-            key,
-            entities.filter((x) => x !== id),
-          )}
+                this._set(
+                  key,
+                  entities.filter((x) => x !== id),
+                )}
             ></ha-icon-button>
           </div>`,
       )}
@@ -185,14 +190,14 @@ export class RmeSettingsWholeHousePlant extends LitElement {
         label="Remove"
         .path=${"M19,13H5V11H19V13Z"}
         @click=${() => {
-        const offsets = { ...this.plant.temperature_offsets };
-        delete offsets[id];
-        this._fire({
-          ...this.plant,
-          temperature_sensors: this.plant.temperature_sensors.filter((x) => x !== id),
-          temperature_offsets: offsets,
-        });
-      }}
+          const offsets = { ...this.plant.temperature_offsets };
+          delete offsets[id];
+          this._fire({
+            ...this.plant,
+            temperature_sensors: this.plant.temperature_sensors.filter((x) => x !== id),
+            temperature_offsets: offsets,
+          });
+        }}
       ></ha-icon-button>
     </div>`;
   }

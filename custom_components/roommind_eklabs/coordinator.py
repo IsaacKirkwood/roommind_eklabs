@@ -464,6 +464,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
 
         config = WholeHousePlantConfig(
             entity_id=entity_id,
+            operating_mode=str(raw.get("operating_mode", "auto")),
             cooling_type="evaporative",
             cooling_target=float(raw.get("cooling_target", 24.0)),
             cooling_start_delta=float(raw.get("cooling_start_delta", 0.5)),
@@ -471,6 +472,11 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             minimum_outdoor_cooling_temp=float(raw.get("minimum_outdoor_cooling_temp", 18.0)),
             evaporative_max_outdoor_humidity=float(raw.get("evaporative_max_outdoor_humidity", 80.0)),
             evaporative_min_indoor_outdoor_delta=float(raw.get("evaporative_min_indoor_outdoor_delta", 1.0)),
+            minimum_cooling_run_minutes=int(raw.get("minimum_cooling_run_minutes", 30)),
+            minimum_ventilation_run_minutes=int(raw.get("minimum_ventilation_run_minutes", 30)),
+            cooling_fan_min_speed=int(raw.get("cooling_fan_min_speed", 4)),
+            cooling_fan_max_speed=int(raw.get("cooling_fan_max_speed", 10)),
+            ventilation_fan_speed=int(raw.get("ventilation_fan_speed", 4)),
             max_continuous_runtime_minutes=int(raw.get("max_continuous_runtime_minutes", 240)),
             feedback_timeout_seconds=int(raw.get("feedback_timeout_seconds", 120)),
             stale_after_seconds=int(raw.get("stale_after_seconds", 180)),
@@ -545,6 +551,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             "ventilation_allowed": plan.ventilation_allowed,
             "current_temperature": indoor_temperature,
             "target_temperature": config.cooling_target,
+            "fan_speed": plan.fan_speed,
             "home_occupied": home_occupied,
             "occupied": occupied,
         }
@@ -562,6 +569,17 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                 )
             except Exception:  # noqa: BLE001
                 _LOGGER.exception("Whole-house plant command failed for '%s'", entity_id)
+        if plan.fan_speed_changed and plan.fan_speed is not None:
+            try:
+                await self.hass.services.async_call(
+                    "climate",
+                    "set_fan_mode",
+                    {"entity_id": entity_id, "fan_mode": str(plan.fan_speed)},
+                    blocking=True,
+                    context=make_roommind_context(),
+                )
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("Whole-house plant fan command failed for '%s'", entity_id)
 
     async def _async_control_shared_heat_sources(self, room_states: dict[str, dict]) -> None:
         """Evaluate aggregate room demand and command whole-house heat sources."""

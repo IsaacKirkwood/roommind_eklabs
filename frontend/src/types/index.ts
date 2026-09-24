@@ -148,12 +148,18 @@ export interface SharedHeatSourceLive {
 export interface WholeHousePlant {
   enabled: boolean;
   entity_id: string;
+  operating_mode: "auto" | "off" | "cool" | "fan_only";
   cooling_target: number;
   cooling_start_delta: number;
   cooling_stop_delta: number;
   minimum_outdoor_cooling_temp: number;
   evaporative_max_outdoor_humidity: number;
   evaporative_min_indoor_outdoor_delta: number;
+  minimum_cooling_run_minutes: number;
+  minimum_ventilation_run_minutes: number;
+  cooling_fan_min_speed: number;
+  cooling_fan_max_speed: number;
+  ventilation_fan_speed: number;
   max_continuous_runtime_minutes: number;
   feedback_timeout_seconds: number;
   stale_after_seconds: number;
@@ -172,6 +178,7 @@ export interface WholeHousePlant {
     fault?: string | null;
     current_temperature?: number | null;
     cooling_allowed?: boolean;
+    fan_speed?: number | null;
   };
 }
 

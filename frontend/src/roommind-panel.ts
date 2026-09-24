@@ -1,6 +1,12 @@
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import type { HomeAssistant, HassArea, RoomConfig, SharedHeatSource } from "./types";
+import type {
+  HomeAssistant,
+  HassArea,
+  RoomConfig,
+  SharedHeatSource,
+  WholeHousePlant,
+} from "./types";
 import { getEntitiesForArea } from "./utils/room-state";
 import { loadHaElements } from "./load-ha-elements";
 import { localize } from "./utils/localize";
@@ -62,6 +68,7 @@ export class RoomMindPanel extends LitElement {
   @state() private _reorderMode = false;
   @state() private _elementsLoaded = false;
   @state() private _sharedHeatSources: SharedHeatSource[] = [];
+  @state() private _wholeHousePlant?: WholeHousePlant;
 
   private _refreshInterval?: ReturnType<typeof setInterval>;
   private _routeApplied = false;
@@ -545,7 +552,9 @@ export class RoomMindPanel extends LitElement {
             class="whole-house"
             .hass=${this.hass}
             .source=${source}
+            .plant=${this._wholeHousePlant}
             @whole-house-changed=${this._onWholeHouseChanged}
+            @whole-house-plant-changed=${this._onWholeHousePlantChanged}
           ></rme-whole-house-card>
         `,
       )}
@@ -813,6 +822,7 @@ export class RoomMindPanel extends LitElement {
         coil_dry_mode: string;
         coil_dry_fan_mode: string;
         shared_heat_sources: SharedHeatSource[];
+        whole_house_plant: WholeHousePlant;
       }>({
         type: "roommind_eklabs/rooms/list",
       });
@@ -835,6 +845,7 @@ export class RoomMindPanel extends LitElement {
       this._presencePersons = result.presence_persons ?? [];
       this._presenceAwayAction = result.presence_away_action ?? "eco";
       this._sharedHeatSources = result.shared_heat_sources ?? [];
+      this._wholeHousePlant = result.whole_house_plant;
     } catch (err) {
       // eslint-disable-next-line no-console
       console.debug("[RoomMind] loadRooms:", err);
@@ -859,6 +870,24 @@ export class RoomMindPanel extends LitElement {
     } catch (err) {
       // eslint-disable-next-line no-console
       console.debug("[RoomMind] save whole house:", err);
+      this._onSaveStatus(new CustomEvent("save-status", { detail: { status: "error" } }));
+    }
+  }
+
+  private async _onWholeHousePlantChanged(event: CustomEvent<{ plant: WholeHousePlant }>) {
+    const plant = event.detail.plant;
+    this._wholeHousePlant = plant;
+    const { live: _live, ...persisted } = plant;
+    try {
+      await this.hass.callWS({
+        type: "roommind_eklabs/settings/save",
+        whole_house_plant: persisted,
+      });
+      this._onSaveStatus(new CustomEvent("save-status", { detail: { status: "saved" } }));
+      await this._loadRooms();
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.debug("[RoomMind] save whole-house plant:", err);
       this._onSaveStatus(new CustomEvent("save-status", { detail: { status: "error" } }));
     }
   }

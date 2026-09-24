@@ -1,6 +1,6 @@
 """Coordinator tests for the single-zone whole-house plant."""
 
-from unittest.mock import ANY, AsyncMock
+from unittest.mock import ANY, AsyncMock, call
 
 import pytest
 from homeassistant.const import UnitOfTemperature
@@ -40,15 +40,27 @@ async def test_plant_commands_evaporative_cooling(hass, mock_config_entry):
 
     await coordinator._async_control_whole_house_plant({}, _settings())
 
-    hass.services.async_call.assert_awaited_once_with(
-        "climate",
-        "set_hvac_mode",
-        {"entity_id": "climate.magiqtouch_zone_1", "hvac_mode": "cool"},
-        blocking=True,
-        context=ANY,
+    hass.services.async_call.assert_has_awaits(
+        [
+            call(
+                "climate",
+                "set_hvac_mode",
+                {"entity_id": "climate.magiqtouch_zone_1", "hvac_mode": "cool"},
+                blocking=True,
+                context=ANY,
+            ),
+            call(
+                "climate",
+                "set_fan_mode",
+                {"entity_id": "climate.magiqtouch_zone_1", "fan_mode": "8"},
+                blocking=True,
+                context=ANY,
+            ),
+        ]
     )
     assert coordinator._whole_house_plant_live["current_temperature"] == 27.0
     assert coordinator._whole_house_plant_live["mode"] == "cool"
+    assert coordinator._whole_house_plant_live["fan_speed"] == 8
 
 
 @pytest.mark.asyncio
