@@ -42,7 +42,9 @@ class WholeHousePlantConfig:
     cooling_start_delta: float = 0.5
     cooling_stop_delta: float = 0.2
     minimum_outdoor_cooling_temp: float = 18.0
-    evaporative_max_outdoor_humidity: float = 80.0
+    evaporative_max_outdoor_humidity: float = 70.0
+    evaporative_max_indoor_humidity: float = 70.0
+    evaporative_humidity_resume_delta: float = 5.0
     evaporative_min_indoor_outdoor_delta: float = 1.0
     minimum_cooling_run_minutes: int = 30
     minimum_ventilation_run_minutes: int = 30
@@ -100,6 +102,7 @@ class WholeHousePlantManager:
         area_occupied: bool,
         heating_active: bool,
         exhaust_ready: bool,
+        outdoor_air_safe: bool,
         ventilation_requested: bool,
         reported_mode: str | None,
         feedback_available: bool,
@@ -121,7 +124,13 @@ class WholeHousePlantManager:
             outdoor_temperature,
             outdoor_humidity,
         )
-        ventilation_allowed = occupied_eligible and exhaust_eligible and feedback_available and not fault
+        ventilation_allowed = (
+            occupied_eligible
+            and exhaust_eligible
+            and outdoor_air_safe
+            and feedback_available
+            and not fault
+        )
 
         desired = MODE_OFF
         reason = "idle"
@@ -133,6 +142,8 @@ class WholeHousePlantManager:
             reason = "occupancy gate clear"
         elif not exhaust_eligible:
             reason = "open an exhaust path"
+        elif not outdoor_air_safe:
+            reason = "outdoor air quality lockout"
         elif self._runtime_exceeded(timestamp):
             fault = "maximum runtime exceeded"
             reason = fault
@@ -246,6 +257,13 @@ class WholeHousePlantManager:
         if outdoor_temp < self.config.minimum_outdoor_cooling_temp:
             return False, "outdoor cooling lockout"
         if self.config.cooling_type == "evaporative":
+            if indoor_humidity is not None:
+                humidity_limit = self.config.evaporative_max_indoor_humidity
+                if self.state.commanded_mode == MODE_COOL:
+                    if indoor_humidity >= humidity_limit:
+                        return False, "indoor humidity limit reached"
+                elif indoor_humidity > humidity_limit - self.config.evaporative_humidity_resume_delta:
+                    return False, "waiting for indoor humidity to fall"
             if outdoor_humidity is None:
                 return False, "waiting for outdoor humidity"
             if outdoor_humidity > self.config.evaporative_max_outdoor_humidity:

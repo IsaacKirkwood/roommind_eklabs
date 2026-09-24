@@ -21,6 +21,7 @@ def _evaluate(manager, **overrides):
         "area_occupied": True,
         "heating_active": False,
         "exhaust_ready": True,
+        "outdoor_air_safe": True,
         "ventilation_requested": False,
         "reported_mode": MODE_OFF,
         "feedback_available": True,
@@ -80,6 +81,33 @@ def test_evaporative_cooling_blocks_high_humidity_but_allows_fresh_air():
     plan = _evaluate(manager, outdoor_humidity=90.0, ventilation_requested=True)
     assert plan.mode == MODE_VENTILATE
     assert plan.cooling_allowed is False
+
+
+def test_evaporative_cooling_stops_at_indoor_humidity_limit_and_waits_for_margin():
+    manager = WholeHousePlantManager(
+        WholeHousePlantConfig(
+            "climate.plant",
+            minimum_cooling_run_minutes=30,
+            evaporative_max_indoor_humidity=70.0,
+            evaporative_humidity_resume_delta=5.0,
+        )
+    )
+    _evaluate(manager, indoor_humidity=60.0, now=1000)
+    stopped = _evaluate(
+        manager,
+        indoor_humidity=70.0,
+        reported_mode=MODE_COOL,
+        now=1100,
+    )
+    assert stopped.mode == MODE_OFF
+    assert stopped.reason == "indoor humidity limit reached"
+
+    waiting = _evaluate(manager, indoor_humidity=68.0, now=1200)
+    assert waiting.mode == MODE_OFF
+    assert waiting.reason == "waiting for indoor humidity to fall"
+
+    restarted = _evaluate(manager, indoor_humidity=65.0, now=1300)
+    assert restarted.mode == MODE_COOL
 
 
 def test_refrigerated_cooling_has_dew_point_guard():
@@ -182,6 +210,20 @@ def test_evaporative_cooling_can_require_an_exhaust_path():
     manager = WholeHousePlantManager(manager.config)
     allowed = _evaluate(manager, exhaust_ready=True)
     assert allowed.mode == MODE_COOL
+
+
+def test_outdoor_air_quality_lockout_stops_cooling_and_fan():
+    manager = WholeHousePlantManager(WholeHousePlantConfig("climate.plant"))
+    cooling = _evaluate(manager, outdoor_air_safe=False)
+    assert cooling.mode == MODE_OFF
+    assert cooling.reason == "outdoor air quality lockout"
+
+    manager = WholeHousePlantManager(
+        WholeHousePlantConfig("climate.plant", operating_mode=MODE_VENTILATE)
+    )
+    fan = _evaluate(manager, outdoor_air_safe=False)
+    assert fan.mode == MODE_OFF
+    assert fan.reason == "outdoor air quality lockout"
 
 
 def test_mpc_forecast_can_start_cooling_before_threshold():

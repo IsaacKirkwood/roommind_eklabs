@@ -22,7 +22,7 @@
 - **Corrected Sensor Averaging** - Combine multiple temperature and humidity sensors into whole-house readings and apply a correction to each sensor independently.
 - **Occupancy-Led Plant Control** - Gate whole-house operation using household presence, downstairs presence sensors, and active media players.
 - **Whole-House Comfort Schedule** - Switch the central heating target between Comfort and Eco using a Home Assistant schedule helper.
-- **Single-Zone Evaporative Cooling** - MagIQtouch plant control for whole-house cooling and fresh air, with adaptive fan speed, separate configurable 30-minute cooling and fan-only minimum runs, optional exhaust-path confirmation, live controls on the Rooms page, and weather, wet-bulb, humidity, runtime, feedback, presence, and gas-heating interlocks.
+- **Single-Zone Evaporative Cooling** - MagIQtouch plant control for whole-house cooling and fresh air, with adaptive fan speed, separate configurable 30-minute cooling and fan-only minimum runs, indoor-humidity hysteresis, optional exhaust-path confirmation and outdoor-air-quality lockouts, live controls on the Rooms page, and weather, wet-bulb, runtime, feedback, presence, and gas-heating interlocks.
 - **Whole-House MPC** - A dedicated persisted thermal model learns gas-heating gain, fan-weighted evaporative-cooling gain, and idle heat loss without mixing data into any room model. Heating and cooling graduate independently from hysteresis fallback to 30-minute predictive control.
 - **Independent Room Learning** - Shared gas heat is exposed separately to each room's thermal model so central heating does not masquerade as local heater output.
 

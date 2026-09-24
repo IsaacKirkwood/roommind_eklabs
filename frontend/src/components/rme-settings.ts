@@ -91,7 +91,9 @@ export class RsSettings extends LitElement {
     cooling_start_delta: 0.5,
     cooling_stop_delta: 0.2,
     minimum_outdoor_cooling_temp: 18,
-    evaporative_max_outdoor_humidity: 80,
+    evaporative_max_outdoor_humidity: 70,
+    evaporative_max_indoor_humidity: 70,
+    evaporative_humidity_resume_delta: 5,
     evaporative_min_indoor_outdoor_delta: 1,
     minimum_cooling_run_minutes: 30,
     minimum_ventilation_run_minutes: 30,
@@ -112,6 +114,7 @@ export class RsSettings extends LitElement {
     media_player_entities: [],
     ventilation_request_entities: [],
     exhaust_ready_entities: [],
+    outdoor_air_lockout_entities: [],
   };
   @state() private _coilDryEnabled = false;
   @state() private _coilDryMinutes = 20;

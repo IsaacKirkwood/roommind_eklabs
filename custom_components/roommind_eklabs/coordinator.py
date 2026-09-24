@@ -606,7 +606,9 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             cooling_start_delta=float(raw.get("cooling_start_delta", 0.5)),
             cooling_stop_delta=float(raw.get("cooling_stop_delta", 0.2)),
             minimum_outdoor_cooling_temp=float(raw.get("minimum_outdoor_cooling_temp", 18.0)),
-            evaporative_max_outdoor_humidity=float(raw.get("evaporative_max_outdoor_humidity", 80.0)),
+            evaporative_max_outdoor_humidity=float(raw.get("evaporative_max_outdoor_humidity", 70.0)),
+            evaporative_max_indoor_humidity=float(raw.get("evaporative_max_indoor_humidity", 70.0)),
+            evaporative_humidity_resume_delta=float(raw.get("evaporative_humidity_resume_delta", 5.0)),
             evaporative_min_indoor_outdoor_delta=float(raw.get("evaporative_min_indoor_outdoor_delta", 1.0)),
             minimum_cooling_run_minutes=int(raw.get("minimum_cooling_run_minutes", 30)),
             minimum_ventilation_run_minutes=int(raw.get("minimum_ventilation_run_minutes", 30)),
@@ -660,6 +662,10 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             and state.state in {"on", "open"}
             for eid in exhaust_entities
         )
+        outdoor_air_safe = not any(
+            (state := self.hass.states.get(eid)) is not None and state.state == "on"
+            for eid in raw.get("outdoor_air_lockout_entities", [])
+        )
         plant_state = self.hass.states.get(entity_id)
         feedback_available = plant_state is not None and plant_state.state not in {"unavailable", "unknown"}
         age = max(0.0, time.time() - plant_state.last_updated.timestamp()) if plant_state is not None else float("inf")
@@ -673,6 +679,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             area_occupied=occupied,
             heating_active=heating_active,
             exhaust_ready=exhaust_ready,
+            outdoor_air_safe=outdoor_air_safe,
             ventilation_requested=ventilation_requested,
             reported_mode=plant_state.state if plant_state is not None else None,
             feedback_available=feedback_available,

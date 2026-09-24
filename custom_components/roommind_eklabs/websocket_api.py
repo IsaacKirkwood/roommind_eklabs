@@ -794,8 +794,14 @@ async def websocket_get_settings(
             vol.Optional("minimum_outdoor_cooling_temp", default=18.0): vol.All(
                 vol.Coerce(float), vol.Range(min=0, max=40)
             ),
-            vol.Optional("evaporative_max_outdoor_humidity", default=80.0): vol.All(
+            vol.Optional("evaporative_max_outdoor_humidity", default=70.0): vol.All(
                 vol.Coerce(float), vol.Range(min=10, max=100)
+            ),
+            vol.Optional("evaporative_max_indoor_humidity", default=70.0): vol.All(
+                vol.Coerce(float), vol.Range(min=30, max=100)
+            ),
+            vol.Optional("evaporative_humidity_resume_delta", default=5.0): vol.All(
+                vol.Coerce(float), vol.Range(min=1, max=20)
             ),
             vol.Optional("evaporative_min_indoor_outdoor_delta", default=1.0): vol.All(
                 vol.Coerce(float), vol.Range(min=0, max=15)
@@ -827,6 +833,7 @@ async def websocket_get_settings(
             vol.Optional("media_player_entities", default=[]): [str],
             vol.Optional("ventilation_request_entities", default=[]): [str],
             vol.Optional("exhaust_ready_entities", default=[]): [str],
+            vol.Optional("outdoor_air_lockout_entities", default=[]): [str],
         },
         vol.Optional("whole_house_average"): {
             vol.Optional("temperature_sensors", default=[]): [str],

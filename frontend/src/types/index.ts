@@ -158,6 +158,8 @@ export interface WholeHousePlant {
   cooling_stop_delta: number;
   minimum_outdoor_cooling_temp: number;
   evaporative_max_outdoor_humidity: number;
+  evaporative_max_indoor_humidity: number;
+  evaporative_humidity_resume_delta: number;
   evaporative_min_indoor_outdoor_delta: number;
   minimum_cooling_run_minutes: number;
   minimum_ventilation_run_minutes: number;
@@ -178,6 +180,7 @@ export interface WholeHousePlant {
   media_player_entities: string[];
   ventilation_request_entities: string[];
   exhaust_ready_entities: string[];
+  outdoor_air_lockout_entities: string[];
   live?: {
     mode?: "off" | "cool" | "fan_only";
     reason?: string;

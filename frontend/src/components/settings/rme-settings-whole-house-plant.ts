@@ -78,6 +78,8 @@ export class RmeSettingsWholeHousePlant extends LitElement {
       ${this._number("Stop above target", "cooling_stop_delta", "°C", 0, 5, 0.1)}
       ${this._number("Minimum outdoor temperature", "minimum_outdoor_cooling_temp", "°C", 0, 40, 0.5)}
       ${this._number("Maximum outdoor humidity", "evaporative_max_outdoor_humidity", "%", 10, 100, 1)}
+      ${this._number("Maximum indoor humidity", "evaporative_max_indoor_humidity", "%", 30, 100, 1)}
+      ${this._number("Humidity restart margin", "evaporative_humidity_resume_delta", "%", 1, 20, 1)}
       ${this._number("Minimum indoor/outdoor advantage", "evaporative_min_indoor_outdoor_delta", "°C", 0, 15, 0.5)}
       ${this._number("Minimum evaporative cooling run", "minimum_cooling_run_minutes", "min", 0, 120, 5)}
       ${this._number("Minimum fan-only run", "minimum_ventilation_run_minutes", "min", 0, 120, 5)}
@@ -104,10 +106,12 @@ export class RmeSettingsWholeHousePlant extends LitElement {
         ></ha-checkbox
       ></ha-formfield>
       ${this._picker("Add exhaust-ready sensor", "exhaust_ready_entities", ["binary_sensor", "input_boolean"])}
+      ${this._picker("Add outdoor-air lockout", "outdoor_air_lockout_entities", ["binary_sensor", "input_boolean"])}
       ${this._picker("Add fresh-air request", "ventilation_request_entities", ["binary_sensor", "input_boolean"])}
       <div class="wide hint">
         Temperature, humidity, and presence come from House averages. Cooling is blocked while gas
-        heat is active or when outdoor conditions make evaporative cooling ineffective.
+        heat is active or when outdoor conditions make evaporative cooling ineffective. Indoor
+        humidity protection needs at least one valid House averages humidity sensor.
       </div>
     </div>`;
   }
@@ -139,7 +143,8 @@ export class RmeSettingsWholeHousePlant extends LitElement {
       | "occupancy_entities"
       | "media_player_entities"
       | "ventilation_request_entities"
-      | "exhaust_ready_entities",
+      | "exhaust_ready_entities"
+      | "outdoor_air_lockout_entities",
     domains: string[],
   ) {
     const entities = this.plant[key] ?? [];
