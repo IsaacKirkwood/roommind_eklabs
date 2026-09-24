@@ -180,6 +180,7 @@ _SETTINGS_SAVE_FIELDS = (
     "compressor_groups",
     "shared_heat_sources",
     "whole_house_plant",
+    "whole_house_average",
 )
 
 
@@ -824,6 +825,16 @@ async def websocket_get_settings(
             vol.Optional("occupancy_entities", default=[]): [str],
             vol.Optional("media_player_entities", default=[]): [str],
             vol.Optional("ventilation_request_entities", default=[]): [str],
+        },
+        vol.Optional("whole_house_average"): {
+            vol.Optional("temperature_sensors", default=[]): [str],
+            vol.Optional("temperature_offsets", default={}): {
+                str: vol.All(vol.Coerce(float), vol.Range(min=-20, max=20))
+            },
+            vol.Optional("humidity_sensor", default=""): str,
+            vol.Optional("home_presence_entities", default=[]): [str],
+            vol.Optional("occupancy_entities", default=[]): [str],
+            vol.Optional("media_player_entities", default=[]): [str],
         },
     }
 )

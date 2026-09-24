@@ -23,6 +23,32 @@ def _settings(**overrides) -> dict:
     return {"whole_house_plant": plant}
 
 
+def test_shared_house_average_prefers_canonical_settings(hass, mock_config_entry):
+    coordinator = _create_coordinator(hass, mock_config_entry)
+    settings = _settings()
+    settings["whole_house_average"] = {
+        "temperature_sensors": ["sensor.house_average"],
+        "temperature_offsets": {"sensor.house_average": -0.5},
+        "humidity_sensor": "sensor.house_humidity",
+        "home_presence_entities": ["person.household"],
+        "occupancy_entities": ["binary_sensor.downstairs"],
+        "media_player_entities": ["media_player.lounge"],
+    }
+
+    assert coordinator._whole_house_average_settings(settings) == settings["whole_house_average"]
+
+
+def test_shared_house_average_migrates_legacy_plant_settings(hass, mock_config_entry):
+    coordinator = _create_coordinator(hass, mock_config_entry)
+
+    average = coordinator._whole_house_average_settings(_settings())
+
+    assert average["temperature_sensors"] == ["sensor.living_temperature"]
+    assert average["temperature_offsets"] == {"sensor.living_temperature": -1.0}
+    assert average["home_presence_entities"] == ["person.isaac"]
+    assert average["occupancy_entities"] == ["binary_sensor.downstairs_presence"]
+
+
 @pytest.mark.asyncio
 async def test_plant_commands_evaporative_cooling(hass, mock_config_entry):
     coordinator = _create_coordinator(hass, mock_config_entry)

@@ -191,6 +191,15 @@ export interface WholeHousePlant {
   };
 }
 
+export interface WholeHouseAverage {
+  temperature_sensors: string[];
+  temperature_offsets: Record<string, number>;
+  humidity_sensor: string;
+  home_presence_entities: string[];
+  occupancy_entities: string[];
+  media_player_entities: string[];
+}
+
 export interface RoomConfig {
   area_id: string;
   thermostats: string[];
@@ -285,6 +294,7 @@ export interface GlobalSettings {
   compressor_groups?: CompressorGroup[];
   shared_heat_sources?: SharedHeatSource[];
   whole_house_plant?: WholeHousePlant;
+  whole_house_average?: WholeHouseAverage;
   room_order?: string[];
   group_by_floor?: boolean;
   boost_applied_at?: Record<string, number>;

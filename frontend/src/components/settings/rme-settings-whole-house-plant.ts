@@ -97,25 +97,10 @@ export class RmeSettingsWholeHousePlant extends LitElement {
           @change=${(e: Event) => this._set("require_occupancy", (e.target as HTMLInputElement).checked)}
         ></ha-checkbox
       ></ha-formfield>
-      <div>
-        <ha-entity-picker
-          .hass=${this.hass}
-          .value=${p.indoor_humidity_sensor}
-          .includeDomains=${["sensor"]}
-          label="Indoor humidity sensor"
-          @value-changed=${(e: CustomEvent) => this._set("indoor_humidity_sensor", e.detail?.value ?? "")}
-        ></ha-entity-picker>
-      </div>
-      ${this._picker("Add temperature sensor", "temperature_sensors", ["sensor"])}
-      <div class="wide">${p.temperature_sensors.map((id) => this._temperatureRow(id))}</div>
-      ${this._picker("Add household member", "home_presence_entities", ["person"])}
-      ${this._picker("Add downstairs presence sensor", "occupancy_entities", ["binary_sensor"])}
-      ${this._picker("Add downstairs Apple TV", "media_player_entities", ["media_player"])}
       ${this._picker("Add fresh-air request", "ventilation_request_entities", ["binary_sensor", "input_boolean"])}
       <div class="wide hint">
-        Cooling is blocked while gas heat is active, when nobody is home, when downstairs is clear,
-        or when outdoor conditions make evaporative cooling ineffective. Fresh-air requests use
-        fan-only mode.
+        Temperature, humidity, and presence come from House averages. Cooling is blocked while gas
+        heat is active or when outdoor conditions make evaporative cooling ineffective.
       </div>
     </div>`;
   }

@@ -154,23 +154,6 @@ export class RsSettingsSharedHeat extends LitElement {
         presence decides when gas may run; local room heaters can trim individual rooms.
       </div>
       <div class="grid">
-        <div>
-          <ha-entity-picker
-            .hass=${this.hass}
-            .value=${""}
-            .includeDomains=${["sensor"]}
-            label="Add temperature sensor"
-            @value-changed=${(e: CustomEvent) => this._addTemperatureSensor(index, e.detail?.value)}
-          ></ha-entity-picker>
-          ${this._renderTemperatureSensors(source, index)}
-        </div>
-        <div>
-          <div class="hint">
-            Temperature inputs are averaged. Add a correction for sensors that read high or low.
-          </div>
-        </div>
-      </div>
-      <div class="grid">
         <ha-formfield label="Require someone to be home">
           <ha-checkbox
             .checked=${source.require_home_presence ?? false}
@@ -178,17 +161,6 @@ export class RsSettingsSharedHeat extends LitElement {
               this._set(index, "require_home_presence", (e.target as HTMLInputElement).checked)}
           ></ha-checkbox>
         </ha-formfield>
-        <div>
-          <ha-entity-picker
-            .hass=${this.hass}
-            .value=${""}
-            .includeDomains=${["person"]}
-            label="Add household member"
-            @value-changed=${(e: CustomEvent) =>
-              this._addEntity(index, "home_presence_entities", e.detail?.value)}
-          ></ha-entity-picker>
-          ${this._renderEntities(index, "home_presence_entities", source.home_presence_entities ?? [])}
-        </div>
         <ha-formfield label="Only use gas when downstairs is occupied">
           <ha-checkbox
             .checked=${source.require_occupancy ?? false}
@@ -206,31 +178,9 @@ export class RsSettingsSharedHeat extends LitElement {
           .value=${String(source.occupancy_hold_minutes ?? 20)}
           @change=${(e: Event) => this._number(index, "occupancy_hold_minutes", e)}
         ></ha-textfield>
-        <div>
-          <ha-entity-picker
-            .hass=${this.hass}
-            .value=${""}
-            .includeDomains=${["binary_sensor"]}
-            label="Add presence sensor"
-            @value-changed=${(e: CustomEvent) =>
-              this._addEntity(index, "occupancy_entities", e.detail?.value)}
-          ></ha-entity-picker>
-          ${this._renderEntities(index, "occupancy_entities", source.occupancy_entities ?? [])}
-        </div>
-        <div>
-          <ha-entity-picker
-            .hass=${this.hass}
-            .value=${""}
-            .includeDomains=${["media_player"]}
-            label="Add Apple TV"
-            @value-changed=${(e: CustomEvent) =>
-              this._addEntity(index, "media_player_entities", e.detail?.value)}
-          ></ha-entity-picker>
-          ${this._renderEntities(index, "media_player_entities", source.media_player_entities ?? [])}
-        </div>
       </div>
       <div class="hint">
-        Presence or an active media player enables whole-house gas heating. Bedroom heating remains
+        House sensors and presence inputs come from House averages. Bedroom heating remains
         available when downstairs is clear.
       </div>
       <div class="actions">

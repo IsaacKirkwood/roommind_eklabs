@@ -446,7 +446,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
 
     def _read_whole_house_temperature(self, room_states: dict[str, dict], settings: dict) -> float | None:
         """Return the corrected average used by the central plant and its model."""
-        raw = settings.get("whole_house_plant") or {}
+        raw = self._whole_house_average_settings(settings)
         temperatures: list[float] = []
         offsets = raw.get("temperature_offsets", {})
         for sensor_id in raw.get("temperature_sensors", []):
@@ -463,6 +463,24 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                 if isinstance(state.get("current_temp"), (int, float))
             ]
         return sum(temperatures) / len(temperatures) if temperatures else None
+
+    @staticmethod
+    def _whole_house_average_settings(settings: dict) -> dict:
+        """Return shared house inputs, falling back to pre-v0.7 plant settings."""
+        shared = settings.get("whole_house_average") or {}
+        if shared:
+            return shared
+        plant = settings.get("whole_house_plant") or {}
+        sources = settings.get("shared_heat_sources") or []
+        heat = sources[0] if sources else {}
+        return {
+            "temperature_sensors": plant.get("temperature_sensors") or heat.get("temperature_sensors", []),
+            "temperature_offsets": plant.get("temperature_offsets") or heat.get("temperature_offsets", {}),
+            "humidity_sensor": plant.get("indoor_humidity_sensor", ""),
+            "home_presence_entities": plant.get("home_presence_entities") or heat.get("home_presence_entities", []),
+            "occupancy_entities": plant.get("occupancy_entities") or heat.get("occupancy_entities", []),
+            "media_player_entities": plant.get("media_player_entities") or heat.get("media_player_entities", []),
+        }
 
     def _update_whole_house_model(self, temperature: float | None, settings: dict) -> None:
         """Train the isolated house model from the previously observed plant state."""
@@ -596,17 +614,18 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             self._whole_house_plant_manager.config = config
 
         indoor_temperature = self._read_whole_house_temperature(room_states, settings)
+        average = self._whole_house_average_settings(settings)
         indoor_humidity = read_sensor_value(
-            self.hass, raw.get("indoor_humidity_sensor"), "whole_house_plant", "humidity"
+            self.hass, average.get("humidity_sensor"), "whole_house_plant", "humidity"
         )
         occupied = any(
             (state := self.hass.states.get(eid)) is not None and state.state == "on"
-            for eid in raw.get("occupancy_entities", [])
+            for eid in average.get("occupancy_entities", [])
         ) or any(
             (state := self.hass.states.get(eid)) is not None and state.state in {"playing", "buffering"}
-            for eid in raw.get("media_player_entities", [])
+            for eid in average.get("media_player_entities", [])
         )
-        home_entities = raw.get("home_presence_entities", [])
+        home_entities = average.get("home_presence_entities", [])
         home_occupied = (
             any((state := self.hass.states.get(eid)) is not None and state.state == "home" for eid in home_entities)
             if home_entities
@@ -705,6 +724,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
     ) -> None:
         """Evaluate aggregate room demand and command whole-house heat sources."""
         settings = settings or {}
+        average = self._whole_house_average_settings(settings)
         demands = [
             RoomHeatDemand(
                 area_id=area_id,
@@ -723,9 +743,10 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         for source_id in self._shared_heat_manager.get_configs():
             config = self._shared_heat_manager.get_configs()[source_id]
             source_temperatures: list[float] = []
-            if config.temperature_sensors:
-                offsets = config.temperature_offsets or {}
-                for entity_id in config.temperature_sensors:
+            temperature_sensors = average.get("temperature_sensors", [])
+            if temperature_sensors:
+                offsets = average.get("temperature_offsets", {})
+                for entity_id in temperature_sensors:
                     raw_value = read_sensor_value(self.hass, entity_id, "whole_house", "temperature")
                     if raw_value is None:
                         continue
@@ -738,8 +759,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                     if area_id in room_states and isinstance(room_states[area_id].get("current_temp"), (int, float))
                 ]
             shared_current_temp = sum(source_temperatures) / len(source_temperatures) if source_temperatures else None
-            plant_settings = settings.get("whole_house_plant") or {}
-            if plant_settings.get("temperature_sensors"):
+            if average.get("temperature_sensors"):
                 canonical_temperature = self._read_whole_house_temperature(room_states, settings)
                 if canonical_temperature is not None:
                     shared_current_temp = canonical_temperature
@@ -763,16 +783,19 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                 and predicted_temperature is not None
             ):
                 control_temperature = min(shared_current_temp, predicted_temperature)
+            occupancy_entities = average.get("occupancy_entities", [])
+            media_entities = average.get("media_player_entities", [])
+            home_entities = average.get("home_presence_entities", [])
             occupied_now = any(
                 (state := self.hass.states.get(entity_id)) is not None and state.state == "on"
-                for entity_id in config.occupancy_entities
+                for entity_id in occupancy_entities
             ) or any(
                 (state := self.hass.states.get(entity_id)) is not None and state.state in {"playing", "buffering"}
-                for entity_id in config.media_player_entities
+                for entity_id in media_entities
             )
             home_occupied = any(
                 (state := self.hass.states.get(entity_id)) is not None and state.state == "home"
-                for entity_id in config.home_presence_entities
+                for entity_id in home_entities
             )
             schedule_active: bool | None = None
             scheduled_preset: str | None = None

@@ -13,6 +13,7 @@ import type {
   CompressorGroup,
   SharedHeatSource,
   WholeHousePlant,
+  WholeHouseAverage,
 } from "../types";
 import { localize } from "../utils/localize";
 import { fireSaveStatus } from "../utils/events";
@@ -27,6 +28,7 @@ import "./settings/rme-settings-valve";
 import "./settings/rme-settings-compressor";
 import "./settings/rme-settings-shared-heat";
 import "./settings/rme-settings-whole-house-plant";
+import "./settings/rme-settings-whole-house-average";
 import "./settings/rme-settings-coil-dry";
 import "./settings/rme-settings-mold";
 import "./settings/rme-settings-notifications";
@@ -71,6 +73,14 @@ export class RsSettings extends LitElement {
   @state() private _moldPreventionNotify = false;
   @state() private _compressorGroups: CompressorGroup[] = [];
   @state() private _sharedHeatSources: SharedHeatSource[] = [];
+  @state() private _wholeHouseAverage: WholeHouseAverage = {
+    temperature_sensors: [],
+    temperature_offsets: {},
+    humidity_sensor: "",
+    home_presence_entities: [],
+    occupancy_entities: [],
+    media_player_entities: [],
+  };
   @state() private _wholeHousePlant: WholeHousePlant = {
     enabled: false,
     entity_id: "",
@@ -166,6 +176,25 @@ export class RsSettings extends LitElement {
       this._compressorGroups = s.compressor_groups ?? [];
       this._sharedHeatSources = s.shared_heat_sources ?? [];
       this._wholeHousePlant = { ...this._wholeHousePlant, ...(s.whole_house_plant ?? {}) };
+      const legacyHeat = this._sharedHeatSources[0];
+      this._wholeHouseAverage = s.whole_house_average ?? {
+        temperature_sensors: this._wholeHousePlant.temperature_sensors.length
+          ? this._wholeHousePlant.temperature_sensors
+          : (legacyHeat?.temperature_sensors ?? []),
+        temperature_offsets: Object.keys(this._wholeHousePlant.temperature_offsets).length
+          ? this._wholeHousePlant.temperature_offsets
+          : (legacyHeat?.temperature_offsets ?? {}),
+        humidity_sensor: this._wholeHousePlant.indoor_humidity_sensor,
+        home_presence_entities: this._wholeHousePlant.home_presence_entities.length
+          ? this._wholeHousePlant.home_presence_entities
+          : (legacyHeat?.home_presence_entities ?? []),
+        occupancy_entities: this._wholeHousePlant.occupancy_entities.length
+          ? this._wholeHousePlant.occupancy_entities
+          : (legacyHeat?.occupancy_entities ?? []),
+        media_player_entities: this._wholeHousePlant.media_player_entities.length
+          ? this._wholeHousePlant.media_player_entities
+          : (legacyHeat?.media_player_entities ?? []),
+      };
       this._coilDryEnabled = s.coil_dry_enabled ?? false;
       this._coilDryMinutes = s.coil_dry_minutes ?? 20;
       this._coilDryMode = s.coil_dry_mode ?? "fan_only";
@@ -286,6 +315,18 @@ export class RsSettings extends LitElement {
           .compressorGroups=${this._compressorGroups}
           @setting-changed=${this._onSettingChanged}
         ></rme-settings-compressor>
+      </rme-settings-panel>
+
+      <rme-settings-panel
+        icon="mdi:home-thermometer-outline"
+        heading="House averages"
+        intro="Choose the shared readings and occupancy signals used by all whole-house heating, cooling, and fresh-air control."
+      >
+        <rme-settings-whole-house-average
+          .hass=${this.hass}
+          .average=${this._wholeHouseAverage}
+          @setting-changed=${this._onSettingChanged}
+        ></rme-settings-whole-house-average>
       </rme-settings-panel>
 
       <rme-settings-panel
@@ -466,6 +507,7 @@ export class RsSettings extends LitElement {
           (source) => source.entity_id && source.rooms.length > 0,
         ),
         whole_house_plant: this._wholeHousePlant,
+        whole_house_average: this._wholeHouseAverage,
         coil_dry_enabled: this._coilDryEnabled,
         coil_dry_minutes: this._coilDryMinutes,
         coil_dry_mode: this._coilDryMode,
