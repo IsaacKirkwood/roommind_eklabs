@@ -4,7 +4,7 @@
 import { html, css, nothing } from "lit";
 import { RsSettingsBase } from "./rme-settings-base";
 import { customElement, property } from "lit/decorators.js";
-import type { HomeAssistant, HassEntity } from "../../types";
+import type { HomeAssistant, HassEntity, WholeHousePlant } from "../../types";
 import { localize } from "../../utils/localize";
 import { tempUnit } from "../../utils/temperature";
 import "../shared/rme-toggle-row";
@@ -16,6 +16,7 @@ export class RsSettingsSensors extends RsSettingsBase {
   @property({ type: String }) public outdoorHumiditySensor = "";
   @property({ type: String }) public weatherEntity = "";
   @property({ type: Boolean }) public outdoorUnavailableNotify = true;
+  @property({ attribute: false }) public wholeHousePlant!: WholeHousePlant;
 
   private _filterTemperature = (entity: HassEntity): boolean => {
     return entity.attributes?.device_class === "temperature";
@@ -39,6 +40,9 @@ export class RsSettingsSensors extends RsSettingsBase {
       : null;
     const outdoorHumidity = this.outdoorHumiditySensor
       ? this._getSensorValue(this.outdoorHumiditySensor)
+      : null;
+    const outdoorAqi = this.wholeHousePlant.outdoor_air_quality_entity
+      ? this._getSensorValue(this.wholeHousePlant.outdoor_air_quality_entity)
       : null;
 
     return html`
@@ -118,6 +122,42 @@ export class RsSettingsSensors extends RsSettingsBase {
       </div>
 
       <div class="settings-section">
+        <div class="sensor-grid">
+          <div class="sensor-field">
+            <ha-entity-picker
+              .hass=${this.hass}
+              .value=${this.wholeHousePlant.outdoor_air_quality_entity}
+              .includeDomains=${["sensor"]}
+              label="Outdoor AQI sensor"
+              allow-custom-entity
+              @value-changed=${(e: CustomEvent) =>
+                this._setPlant("outdoor_air_quality_entity", e.detail?.value ?? "")}
+            ></ha-entity-picker>
+            ${outdoorAqi !== null
+              ? html`<div class="current-value">Currently ${outdoorAqi} AQI outside</div>`
+              : nothing}
+          </div>
+          <ha-textfield
+            type="number"
+            label="Maximum safe outdoor AQI"
+            suffix="AQI"
+            min="0"
+            max="500"
+            step="1"
+            .value=${String(this.wholeHousePlant.outdoor_air_quality_max_aqi)}
+            @change=${(e: Event) =>
+              this._setPlant(
+                "outdoor_air_quality_max_aqi",
+                Number((e.target as HTMLInputElement).value),
+              )}
+          ></ha-textfield>
+        </div>
+        <span class="field-hint">
+          Blocks evaporative cooling and fresh-air mode when the selected outdoor AQI exceeds this limit.
+        </span>
+      </div>
+
+      <div class="settings-section">
         <rme-toggle-row
           .label=${localize("settings.outdoor_unavailable_notify", l)}
           .hint=${localize("settings.outdoor_unavailable_notify_hint", l)}
@@ -126,6 +166,10 @@ export class RsSettingsSensors extends RsSettingsBase {
         ></rme-toggle-row>
       </div>
     `;
+  }
+
+  private _setPlant(key: keyof WholeHousePlant, value: unknown): void {
+    this._fire("wholeHousePlant", { ...this.wholeHousePlant, [key]: value });
   }
 
   static styles = [

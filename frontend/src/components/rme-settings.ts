@@ -263,6 +263,7 @@ export class RsSettings extends LitElement {
           .outdoorHumiditySensor=${this._outdoorHumiditySensor}
           .weatherEntity=${this._weatherEntity}
           .outdoorUnavailableNotify=${this._outdoorUnavailableNotify}
+          .wholeHousePlant=${this._wholeHousePlant}
           @setting-changed=${this._onSettingChanged}
         ></rme-settings-sensors>
       </rme-settings-panel>

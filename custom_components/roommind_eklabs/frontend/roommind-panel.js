@@ -5615,7 +5615,7 @@
           ></ha-switch>
         </div>
       </div>
-    `}static{this.styles=[K.settingsBaseStyles]}};j([b({attribute:!1})],mn.prototype,`hass`,void 0),j([b({type:Boolean})],mn.prototype,`groupByFloor`,void 0),j([b({type:Boolean})],mn.prototype,`climateControlActive`,void 0),mn=j([y(`rme-settings-general`)],mn),v(),S(),M();var hn=class extends K{constructor(...e){super(...e),this.outdoorTempSensor=``,this.outdoorHumiditySensor=``,this.weatherEntity=``,this.outdoorUnavailableNotify=!0,this._filterTemperature=e=>e.attributes?.device_class===`temperature`,this._filterHumidity=e=>e.attributes?.device_class===`humidity`}_getSensorValue(e){let t=this.hass.states[e];if(!t||t.state===`unavailable`||t.state===`unknown`)return null;let n=parseFloat(t.state);return isNaN(n)?null:Math.round(n*10)/10}render(){let e=this.hass.language,t=this.outdoorTempSensor?this._getSensorValue(this.outdoorTempSensor):null,n=this.outdoorHumiditySensor?this._getSensorValue(this.outdoorHumiditySensor):null;return h`
+    `}static{this.styles=[K.settingsBaseStyles]}};j([b({attribute:!1})],mn.prototype,`hass`,void 0),j([b({type:Boolean})],mn.prototype,`groupByFloor`,void 0),j([b({type:Boolean})],mn.prototype,`climateControlActive`,void 0),mn=j([y(`rme-settings-general`)],mn),v(),S(),M();var hn=class extends K{constructor(...e){super(...e),this.outdoorTempSensor=``,this.outdoorHumiditySensor=``,this.weatherEntity=``,this.outdoorUnavailableNotify=!0,this._filterTemperature=e=>e.attributes?.device_class===`temperature`,this._filterHumidity=e=>e.attributes?.device_class===`humidity`}_getSensorValue(e){let t=this.hass.states[e];if(!t||t.state===`unavailable`||t.state===`unknown`)return null;let n=parseFloat(t.state);return isNaN(n)?null:Math.round(n*10)/10}render(){let e=this.hass.language,t=this.outdoorTempSensor?this._getSensorValue(this.outdoorTempSensor):null,n=this.outdoorHumiditySensor?this._getSensorValue(this.outdoorHumiditySensor):null,r=this.wholeHousePlant.outdoor_air_quality_entity?this._getSensorValue(this.wholeHousePlant.outdoor_air_quality_entity):null;return h`
       <div class="settings-section first">
         <div class="sensor-grid">
           <div class="sensor-field">
@@ -5666,6 +5666,35 @@
       </div>
 
       <div class="settings-section">
+        <div class="sensor-grid">
+          <div class="sensor-field">
+            <ha-entity-picker
+              .hass=${this.hass}
+              .value=${this.wholeHousePlant.outdoor_air_quality_entity}
+              .includeDomains=${[`sensor`]}
+              label="Outdoor AQI sensor"
+              allow-custom-entity
+              @value-changed=${e=>this._setPlant(`outdoor_air_quality_entity`,e.detail?.value??``)}
+            ></ha-entity-picker>
+            ${r===null?g:h`<div class="current-value">Currently ${r} AQI outside</div>`}
+          </div>
+          <ha-textfield
+            type="number"
+            label="Maximum safe outdoor AQI"
+            suffix="AQI"
+            min="0"
+            max="500"
+            step="1"
+            .value=${String(this.wholeHousePlant.outdoor_air_quality_max_aqi)}
+            @change=${e=>this._setPlant(`outdoor_air_quality_max_aqi`,Number(e.target.value))}
+          ></ha-textfield>
+        </div>
+        <span class="field-hint">
+          Blocks evaporative cooling and fresh-air mode when the selected outdoor AQI exceeds this limit.
+        </span>
+      </div>
+
+      <div class="settings-section">
         <rme-toggle-row
           .label=${C(`settings.outdoor_unavailable_notify`,e)}
           .hint=${C(`settings.outdoor_unavailable_notify_hint`,e)}
@@ -5673,7 +5702,7 @@
           @toggle-changed=${e=>this._fire(`outdoorUnavailableNotify`,e.detail)}
         ></rme-toggle-row>
       </div>
-    `}static{this.styles=[K.settingsBaseStyles,l`
+    `}_setPlant(e,t){this._fire(`wholeHousePlant`,{...this.wholeHousePlant,[e]:t})}static{this.styles=[K.settingsBaseStyles,l`
       .sensor-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -5693,7 +5722,7 @@
           grid-template-columns: 1fr;
         }
       }
-    `]}};j([b({attribute:!1})],hn.prototype,`hass`,void 0),j([b({type:String})],hn.prototype,`outdoorTempSensor`,void 0),j([b({type:String})],hn.prototype,`outdoorHumiditySensor`,void 0),j([b({type:String})],hn.prototype,`weatherEntity`,void 0),j([b({type:Boolean})],hn.prototype,`outdoorUnavailableNotify`,void 0),hn=j([y(`rme-settings-sensors`)],hn),v(),S(),M();var gn=`https://github.com/snazzybean/roommind/blob/main/docs/control-and-devices.md`,_n=class extends K{constructor(...e){super(...e),this.controlMode=`mpc`,this.comfortWeight=70,this.outdoorCoolingMin=16,this.outdoorHeatingMax=22,this.predictionEnabled=!0,this.scheduleOffAction=`eco`}render(){let e=this.hass.language;return h`
+    `]}};j([b({attribute:!1})],hn.prototype,`hass`,void 0),j([b({type:String})],hn.prototype,`outdoorTempSensor`,void 0),j([b({type:String})],hn.prototype,`outdoorHumiditySensor`,void 0),j([b({type:String})],hn.prototype,`weatherEntity`,void 0),j([b({type:Boolean})],hn.prototype,`outdoorUnavailableNotify`,void 0),j([b({attribute:!1})],hn.prototype,`wholeHousePlant`,void 0),hn=j([y(`rme-settings-sensors`)],hn),v(),S(),M();var gn=`https://github.com/snazzybean/roommind/blob/main/docs/control-and-devices.md`,_n=class extends K{constructor(...e){super(...e),this.controlMode=`mpc`,this.comfortWeight=70,this.outdoorCoolingMin=16,this.outdoorHeatingMax=22,this.predictionEnabled=!0,this.scheduleOffAction=`eco`}render(){let e=this.hass.language;return h`
       <div class="settings-section first">
         <p class="hint">${C(`settings.control_mode_hint`,e)}</p>
         <div class="radio-group">
@@ -6524,18 +6553,6 @@
       ></ha-formfield>
       ${this._picker(`Add exhaust-ready sensor`,`exhaust_ready_entities`,[`binary_sensor`,`input_boolean`])}
       ${this._picker(`Add outdoor-air lockout`,`outdoor_air_lockout_entities`,[`binary_sensor`,`input_boolean`])}
-      <div>
-        <ha-entity-picker
-          .hass=${this.hass}
-          .value=${e.outdoor_air_quality_entity}
-          .includeDomains=${[`sensor`]}
-          label="Outdoor AQI sensor"
-          allow-custom-entity
-          @value-changed=${e=>this._set(`outdoor_air_quality_entity`,e.detail?.value??``)}
-        ></ha-entity-picker>
-        <div class="hint">Use the nearest reliable outdoor station, such as EPA Macleod hourly overall AQI.</div>
-      </div>
-      ${this._number(`Maximum safe outdoor AQI`,`outdoor_air_quality_max_aqi`,`AQI`,0,500,1)}
       ${this._picker(`Add fresh-air request`,`ventilation_request_entities`,[`binary_sensor`,`input_boolean`])}
       <div class="wide hint">
         Temperature, humidity, and presence come from House averages. Cooling is blocked while gas
@@ -7324,6 +7341,7 @@
           .outdoorHumiditySensor=${this._outdoorHumiditySensor}
           .weatherEntity=${this._weatherEntity}
           .outdoorUnavailableNotify=${this._outdoorUnavailableNotify}
+          .wholeHousePlant=${this._wholeHousePlant}
           @setting-changed=${this._onSettingChanged}
         ></rme-settings-sensors>
       </rme-settings-panel>
