@@ -165,6 +165,16 @@ export class RmeWholeHouseCard extends LitElement {
         color: var(--text-primary-color, white);
         border-color: var(--primary-color);
       }
+      .mode button.heating-power {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        border-radius: 6px;
+        margin-left: 0;
+      }
+      .mode .heating-power ha-icon {
+        --mdc-icon-size: 18px;
+      }
       .temperatures {
         gap: 12px;
       }
@@ -280,11 +290,16 @@ export class RmeWholeHouseCard extends LitElement {
               >
                 Eco
               </button>
-              <ha-icon-button
-                label=${enabled ? "Turn whole-house heating off" : "Turn whole-house heating on"}
-                icon=${enabled ? "mdi:power" : "mdi:power-off"}
+              <button
+                class="heating-power"
+                title=${enabled ? "Turn whole-house heating off" : "Turn whole-house heating on"}
+                aria-label=${enabled ? "Turn whole-house heating off" : "Turn whole-house heating on"}
+                ?active=${!enabled}
                 @click=${() => this._change({ thermostat_enabled: !enabled })}
-              ></ha-icon-button>
+              >
+                <ha-icon icon=${enabled ? "mdi:power" : "mdi:power-off"}></ha-icon>
+                ${enabled ? "Off" : "On"}
+              </button>
             </div>
             <div class="temperatures">
               <ha-textfield
