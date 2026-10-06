@@ -83,6 +83,13 @@ async def test_plant_commands_evaporative_cooling(hass, mock_config_entry):
                 blocking=True,
                 context=ANY,
             ),
+            call(
+                "climate",
+                "set_hvac_mode",
+                {"entity_id": "climate.magiqtouch_zone_1", "hvac_mode": "cool"},
+                blocking=True,
+                context=ANY,
+            ),
         ]
     )
     assert coordinator._whole_house_plant_live["current_temperature"] == 27.0
@@ -183,7 +190,12 @@ async def test_plant_uses_fan_only_for_fresh_air(hass, mock_config_entry):
         {}, _settings(ventilation_request_entities=["input_boolean.fresh_air"])
     )
 
-    assert hass.services.async_call.await_args.args[2]["hvac_mode"] == "fan_only"
+    calls = hass.services.async_call.await_args_list
+    assert calls[-1].args[:3] == (
+        "climate",
+        "set_hvac_mode",
+        {"entity_id": "climate.magiqtouch_zone_1", "hvac_mode": "fan_only"},
+    )
 
 
 @pytest.mark.asyncio

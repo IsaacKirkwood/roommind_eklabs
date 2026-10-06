@@ -777,6 +777,17 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                     blocking=True,
                     context=make_roommind_context(),
                 )
+                # MagIQtouch applies mode and fan speed as separate Modbus
+                # commands. A speed write can leave the controller reporting
+                # Off, so make the requested active mode the final command.
+                if plan.mode != PLANT_MODE_OFF:
+                    await self.hass.services.async_call(
+                        "climate",
+                        "set_hvac_mode",
+                        {"entity_id": entity_id, "hvac_mode": plan.mode},
+                        blocking=True,
+                        context=make_roommind_context(),
+                    )
             except Exception:  # noqa: BLE001
                 _LOGGER.exception("Whole-house plant fan command failed for '%s'", entity_id)
 
