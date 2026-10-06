@@ -91,6 +91,47 @@ async def test_plant_commands_evaporative_cooling(hass, mock_config_entry):
 
 
 @pytest.mark.asyncio
+async def test_plant_retries_until_entity_reports_requested_mode(hass, mock_config_entry):
+    """A missed first command must not leave RoomMind believing cooling is active."""
+    coordinator = _create_coordinator(hass, mock_config_entry)
+    coordinator.outdoor_temp_effective = 22.0
+    coordinator.outdoor_humidity = 40.0
+    hass.config.units.temperature_unit = UnitOfTemperature.CELSIUS
+    states = {
+        "climate.magiqtouch_zone_1": State("climate.magiqtouch_zone_1", "off"),
+        "sensor.living_temperature": State("sensor.living_temperature", "28", {"unit_of_measurement": "°C"}),
+        "person.isaac": State("person.isaac", "home"),
+        "binary_sensor.downstairs_presence": State("binary_sensor.downstairs_presence", "on"),
+    }
+    hass.states.get.side_effect = states.get
+    hass.services.async_call = AsyncMock()
+
+    await coordinator._async_control_whole_house_plant({}, _settings())
+    await coordinator._async_control_whole_house_plant({}, _settings())
+
+    cool_calls = [
+        item for item in hass.services.async_call.await_args_list
+        if item.args[:2] == ("climate", "set_hvac_mode") and item.args[2].get("hvac_mode") == "cool"
+    ]
+    assert len(cool_calls) == 2
+
+
+def test_whole_house_override_expires(hass, mock_config_entry, monkeypatch):
+    coordinator = _create_coordinator(hass, mock_config_entry)
+    monkeypatch.setattr("custom_components.roommind_eklabs.coordinator.time.time", lambda: 1000.0)
+
+    active = coordinator._active_whole_house_override(
+        {"whole_house_override": {"mode": "cool", "temperature": 23, "until": 4600}}
+    )
+    expired = coordinator._active_whole_house_override(
+        {"whole_house_override": {"mode": "heat", "temperature": 20, "until": 999}}
+    )
+
+    assert active == {"mode": "cool", "temperature": 23.0, "until": 4600.0}
+    assert expired is None
+
+
+@pytest.mark.asyncio
 async def test_plant_averages_corrected_humidity_sensors(hass, mock_config_entry):
     coordinator = _create_coordinator(hass, mock_config_entry)
     coordinator.outdoor_temp_effective = 22.0

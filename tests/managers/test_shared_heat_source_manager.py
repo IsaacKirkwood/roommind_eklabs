@@ -54,6 +54,31 @@ def test_single_room_below_whole_house_target_starts_gas():
     assert plan.local_heat_allowed == frozenset()
 
 
+def test_override_target_replaces_comfort_target():
+    manager = SharedHeatSourceManager()
+    manager.load_sources([_source(thermostat_enabled=False)])
+
+    plan = manager.evaluate(
+        "gas",
+        [],
+        shared_current_temp=18.0,
+        override_target=21.0,
+        now=1000,
+    )
+
+    assert plan.active is True
+
+
+def test_cooling_override_forces_heat_source_off():
+    manager = SharedHeatSourceManager()
+    manager.load_sources([_source(min_run_minutes=0)])
+    manager.evaluate("gas", [], shared_current_temp=18.0, override_target=21.0, now=1000)
+
+    plan = manager.evaluate("gas", [], shared_current_temp=18.0, force_off=True, now=1001)
+
+    assert plan.active is False
+
+
 def test_single_room_starts_without_power_or_room_count_thresholds():
     manager = SharedHeatSourceManager()
     manager.load_sources([_source(aggregate_power_threshold=0.8)])

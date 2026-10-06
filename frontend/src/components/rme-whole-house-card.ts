@@ -1,6 +1,6 @@
 import { LitElement, html, css, nothing } from "lit";
-import { customElement, property } from "lit/decorators.js";
-import type { HomeAssistant, SharedHeatSource, WholeHousePlant } from "../types";
+import { customElement, property, state } from "lit/decorators.js";
+import type { HomeAssistant, SharedHeatSource, WholeHouseOverride, WholeHousePlant } from "../types";
 import { inputStyles } from "../styles/input-styles";
 
 @customElement("rme-whole-house-card")
@@ -8,6 +8,14 @@ export class RmeWholeHouseCard extends LitElement {
   @property({ attribute: false }) public hass!: HomeAssistant;
   @property({ attribute: false }) public source!: SharedHeatSource;
   @property({ attribute: false }) public plant?: WholeHousePlant;
+  @property({ attribute: false }) public override: WholeHouseOverride = {
+    mode: "off",
+    temperature: 20,
+    until: null,
+  };
+  @state() private _overrideMode: "heat" | "cool" = "heat";
+  @state() private _overrideTarget = 20;
+  @state() private _overrideHours = 1;
 
   static styles = [
     inputStyles,
@@ -66,6 +74,27 @@ export class RmeWholeHouseCard extends LitElement {
       .plant-section + .plant-section {
         border-left: 1px solid var(--divider-color);
         padding-left: 20px;
+      }
+      .override-section {
+        grid-column: 1 / -1;
+        border-top: 1px solid var(--divider-color);
+        padding-top: 16px;
+      }
+      .override-controls {
+        display: grid;
+        grid-template-columns: auto minmax(110px, 1fr) minmax(100px, 0.7fr) auto auto;
+        gap: 10px;
+        align-items: center;
+      }
+      .apply-override {
+        min-height: 40px;
+        border: 0;
+        border-radius: 6px;
+        padding: 0 18px;
+        background: var(--primary-color);
+        color: var(--text-primary-color, white);
+        font: inherit;
+        cursor: pointer;
       }
       .section-heading {
         display: flex;
@@ -158,6 +187,12 @@ export class RmeWholeHouseCard extends LitElement {
         .temperatures {
           align-items: stretch;
         }
+        .override-section {
+          grid-column: auto;
+        }
+        .override-controls {
+          grid-template-columns: 1fr 1fr;
+        }
       }
     `,
   ];
@@ -191,6 +226,13 @@ export class RmeWholeHouseCard extends LitElement {
       : mpcActive
         ? "MPC active"
         : `MPC learning ${Math.round((plantLive?.mpc_confidence ?? live?.mpc_confidence ?? 0) * 100)}%`;
+    const overrideActive =
+      this.override.mode !== "off" &&
+      typeof this.override.until === "number" &&
+      this.override.until > Date.now() / 1000;
+    const overrideMinutes = overrideActive
+      ? Math.max(1, Math.ceil((this.override.until! - Date.now() / 1000) / 60))
+      : 0;
     return html`
       <ha-card class=${enabled || plantEnabled ? "" : "off"}>
         <div class="top">
@@ -325,6 +367,59 @@ export class RmeWholeHouseCard extends LitElement {
               ></ha-textfield>
             </div>
           </div>
+          <div class="override-section">
+            <div class="section-heading">
+              <div class="section-title">
+                <ha-icon icon="mdi:timer-cog-outline"></ha-icon> Temporary override
+              </div>
+              <div class="plant-status">
+                ${overrideActive
+                  ? `${this.override.mode === "heat" ? "Heating" : "Cooling"} to ${this.override.temperature}°C · ${overrideMinutes} min left`
+                  : "Schedule resumes automatically"}
+              </div>
+            </div>
+            <div class="override-controls">
+              <div class="mode">
+                <button
+                  ?active=${this._overrideMode === "heat"}
+                  @click=${() => this._selectOverrideMode("heat")}
+                >Heat</button>
+                <button
+                  ?active=${this._overrideMode === "cool"}
+                  @click=${() => this._selectOverrideMode("cool")}
+                >Cool</button>
+              </div>
+              <ha-textfield
+                type="number"
+                min="5"
+                max="35"
+                step="0.5"
+                label="Target"
+                suffix="°C"
+                .value=${String(this._overrideTarget)}
+                @change=${(e: Event) =>
+                  (this._overrideTarget = Number((e.target as HTMLInputElement).value))}
+              ></ha-textfield>
+              <ha-textfield
+                type="number"
+                min="0.25"
+                max="24"
+                step="0.25"
+                label="Duration"
+                suffix="hours"
+                .value=${String(this._overrideHours)}
+                @change=${(e: Event) =>
+                  (this._overrideHours = Number((e.target as HTMLInputElement).value))}
+              ></ha-textfield>
+              <button class="apply-override" @click=${this._applyOverride}>Apply</button>
+              <ha-icon-button
+                icon="mdi:close-circle-outline"
+                label="Cancel temporary override"
+                ?disabled=${!overrideActive}
+                @click=${this._cancelOverride}
+              ></ha-icon-button>
+            </div>
+          </div>
         </div>
       </ha-card>
     `;
@@ -364,6 +459,37 @@ export class RmeWholeHouseCard extends LitElement {
     this.dispatchEvent(
       new CustomEvent("whole-house-plant-changed", {
         detail: { plant: { ...this.plant, ...changes } },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  private _selectOverrideMode(mode: "heat" | "cool") {
+    this._overrideMode = mode;
+    this._overrideTarget = mode === "heat"
+      ? (this.source.comfort_temperature ?? this.source.target_temperature ?? 18)
+      : (this.plant?.cooling_target ?? 24);
+  }
+
+  private _applyOverride() {
+    if (!Number.isFinite(this._overrideTarget) || !Number.isFinite(this._overrideHours)) return;
+    const hours = Math.min(24, Math.max(0.25, this._overrideHours));
+    this._fireOverride({
+      mode: this._overrideMode,
+      temperature: Math.min(35, Math.max(5, this._overrideTarget)),
+      until: Date.now() / 1000 + hours * 3600,
+    });
+  }
+
+  private _cancelOverride() {
+    this._fireOverride({ mode: "off", temperature: this.override.temperature, until: null });
+  }
+
+  private _fireOverride(override: WholeHouseOverride) {
+    this.dispatchEvent(
+      new CustomEvent("whole-house-override-changed", {
+        detail: { override },
         bubbles: true,
         composed: true,
       }),

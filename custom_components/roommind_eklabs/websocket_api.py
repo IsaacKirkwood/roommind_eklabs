@@ -181,6 +181,7 @@ _SETTINGS_SAVE_FIELDS = (
     "shared_heat_sources",
     "whole_house_plant",
     "whole_house_average",
+    "whole_house_override",
 )
 
 
@@ -358,6 +359,10 @@ async def websocket_list_rooms(
                 **settings.get("whole_house_plant", {}),
                 "live": ((coordinator.data or {}).get("whole_house_plant", {}) if coordinator else {}),
             },
+            "whole_house_override": settings.get(
+                "whole_house_override",
+                {"mode": "off", "temperature": 20.0, "until": None},
+            ),
         },
     )
 
@@ -852,6 +857,11 @@ async def websocket_get_settings(
             vol.Optional("home_presence_entities", default=[]): [str],
             vol.Optional("occupancy_entities", default=[]): [str],
             vol.Optional("media_player_entities", default=[]): [str],
+        },
+        vol.Optional("whole_house_override"): {
+            vol.Required("mode"): vol.In(["heat", "cool", "off"]),
+            vol.Optional("temperature", default=20.0): vol.All(vol.Coerce(float), vol.Range(min=5, max=35)),
+            vol.Optional("until", default=None): vol.Any(vol.Coerce(float), None),
         },
     }
 )

@@ -200,6 +200,8 @@ class SharedHeatSourceManager:
         shared_current_temp: float | None = None,
         home_occupied: bool = True,
         scheduled_preset: str | None = None,
+        override_target: float | None = None,
+        force_off: bool = False,
     ) -> SharedHeatSourcePlan:
         """Return and record the next plan for one source."""
         timestamp = monotonic() if now is None else now
@@ -228,16 +230,18 @@ class SharedHeatSourceManager:
                 shared_current_temp = sum(available_temperatures) / len(available_temperatures)
 
         effective_preset = scheduled_preset or config.preset_mode
-        effective_target = (
+        effective_target = override_target if override_target is not None else (
             config.eco_temperature if effective_preset == "eco" else config.comfort_temperature
         )
+        thermostat_enabled = config.thermostat_enabled or override_target is not None
         if shared_current_temp is not None:
             max_delta = max(0.0, effective_target - shared_current_temp)
             start_requested = (
-                config.thermostat_enabled and occupancy_eligible and max_delta >= config.start_delta
+                thermostat_enabled and not force_off and occupancy_eligible and max_delta >= config.start_delta
             )
             stop_requested = (
-                not config.thermostat_enabled
+                force_off
+                or not thermostat_enabled
                 or not occupancy_eligible
                 or shared_current_temp >= effective_target - config.stop_delta
             )

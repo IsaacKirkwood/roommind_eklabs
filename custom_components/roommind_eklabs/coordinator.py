@@ -572,7 +572,15 @@ class RoomMindCoordinator(DataUpdateCoordinator):
 
     async def _async_control_whole_house_plant(self, room_states: dict[str, dict], settings: dict) -> None:
         """Control a single-zone whole-house evaporative cooler/fresh-air plant."""
-        raw = settings.get("whole_house_plant") or {}
+        raw = dict(settings.get("whole_house_plant") or {})
+        override = self._active_whole_house_override(settings)
+        if override:
+            if override["mode"] == "cool":
+                raw["enabled"] = True
+                raw["operating_mode"] = "cool"
+                raw["cooling_target"] = override["temperature"]
+            elif override["mode"] == "heat":
+                raw["operating_mode"] = "off"
         entity_id = str(raw.get("entity_id", ""))
         if not raw.get("enabled", False) or not entity_id.startswith("climate."):
             if (
@@ -744,7 +752,11 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         for room_state in room_states.values():
             room_state["shared_cooling_active"] = plan.mode == "cool"
             room_state["shared_ventilation_active"] = plan.mode == "fan_only"
-        if plan.transition:
+        reported_mode = plant_state.state if plant_state is not None else None
+        command_needed = plan.transition or (
+            feedback_available and reported_mode != plan.mode
+        )
+        if command_needed:
             try:
                 await self.hass.services.async_call(
                     "climate",
@@ -772,6 +784,9 @@ class RoomMindCoordinator(DataUpdateCoordinator):
     ) -> None:
         """Evaluate aggregate room demand and command whole-house heat sources."""
         settings = settings or {}
+        override = self._active_whole_house_override(settings)
+        override_mode = override["mode"] if override else None
+        override_target = override["temperature"] if override and override_mode == "heat" else None
         average = self._whole_house_average_settings(settings)
         demands = [
             RoomHeatDemand(
@@ -859,6 +874,8 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                 shared_current_temp=control_temperature,
                 home_occupied=home_occupied,
                 scheduled_preset=scheduled_preset,
+                override_target=override_target,
+                force_off=override_mode == "cool",
             )
             shared_rooms.update(plan.shared_heat_rooms)
             local_allowed.update(plan.local_heat_allowed)
@@ -881,14 +898,14 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                         if self._whole_house_mpc_advice is not None
                         else 0.0
                     ),
-                    "target_temperature": (
+                    "target_temperature": override_target if override_target is not None else (
                         config.eco_temperature
                         if (scheduled_preset or config.preset_mode) == "eco"
                         else config.comfort_temperature
                     ),
                     "preset_mode": scheduled_preset or config.preset_mode,
                     "schedule_active": schedule_active,
-                    "thermostat_enabled": config.thermostat_enabled,
+                    "thermostat_enabled": config.thermostat_enabled or override_target is not None,
                     "home_occupied": home_occupied,
                 }
             )
@@ -900,6 +917,21 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         self._shared_heat_plans = live_plans
         for area_id, room_state in room_states.items():
             room_state["shared_heat_active"] = area_id in shared_rooms
+
+    @staticmethod
+    def _active_whole_house_override(settings: dict) -> dict[str, Any] | None:
+        """Return a valid, unexpired whole-house override."""
+        override = settings.get("whole_house_override") or {}
+        if override.get("mode") not in {"heat", "cool"}:
+            return None
+        try:
+            temperature = float(override["temperature"])
+            until = float(override["until"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        if not 5.0 <= temperature <= 35.0 or until <= time.time():
+            return None
+        return {"mode": override["mode"], "temperature": temperature, "until": until}
 
     async def _async_set_shared_heat_source(self, entity_id: str, active: bool) -> None:
         """Apply a shared heat-source transition to a switch or climate entity."""

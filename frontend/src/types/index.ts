@@ -148,6 +148,12 @@ export interface SharedHeatSourceLive {
   mpc_confidence?: number;
 }
 
+export interface WholeHouseOverride {
+  mode: "heat" | "cool" | "off";
+  temperature: number;
+  until: number | null;
+}
+
 export interface WholeHousePlant {
   enabled: boolean;
   entity_id: string;
