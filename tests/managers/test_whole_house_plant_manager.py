@@ -126,11 +126,11 @@ def test_nobody_home_blocks_cooling_and_ventilation():
     assert plan.ventilation_allowed is False
 
 
-def test_stale_feedback_fails_closed():
+def test_unchanged_available_feedback_is_not_treated_as_stale():
     manager = WholeHousePlantManager(WholeHousePlantConfig("climate.plant"))
     plan = _evaluate(manager, feedback_age_seconds=181)
-    assert plan.mode == MODE_OFF
-    assert plan.fault == "plant feedback stale"
+    assert plan.mode == MODE_COOL
+    assert plan.fault is None
 
 
 def test_command_mismatch_becomes_fault_after_timeout():

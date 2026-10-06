@@ -295,8 +295,12 @@ class WholeHousePlantManager:
     ) -> str | None:
         if not available:
             return "plant unavailable"
-        if age_seconds > self.config.stale_after_seconds:
-            return "plant feedback stale"
+        # Home Assistant's last_updated timestamp means "the state changed",
+        # not "the integration is still communicating". A healthy climate
+        # entity can remain Off for hours without changing, so its age cannot
+        # be used as a liveness signal. Availability plus the post-command
+        # mismatch timeout below provide the actionable feedback safeguards.
+        _ = age_seconds
         if self.state.commanded_mode == MODE_OFF:
             self.state.mismatch_since = None
             return None
