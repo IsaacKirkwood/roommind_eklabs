@@ -1408,6 +1408,10 @@ class MPCController:
                             {"entity_id": eid, "temperature": ha_cool_target, "hvac_mode": "cool"},
                             temp_intent="cool",
                         )
+                        # Some integrations retain the previous heat mode while
+                        # applying a new setpoint. Reconcile after the temperature
+                        # write so the final device state always matches our intent.
+                        await self._call("set_hvac_mode", {"entity_id": eid, "hvac_mode": "cool"})
                     else:
                         await self._call("set_hvac_mode", {"entity_id": eid, "hvac_mode": "heat"})
                         await self._call(
@@ -1422,6 +1426,7 @@ class MPCController:
                         {"entity_id": eid, "temperature": ha_cool_target, "hvac_mode": "cool"},
                         temp_intent="cool",
                     )
+                    await self._call("set_hvac_mode", {"entity_id": eid, "hvac_mode": "cool"})
                 elif can_heat and ha_heat_target is not None and "heat" in ac_modes:
                     await self._call("set_hvac_mode", {"entity_id": eid, "hvac_mode": "heat"})
                     await self._call(
@@ -1648,6 +1653,7 @@ class MPCController:
                     temp_intent="cool",
                     deadband=self._proportional_deadband(eid, current_temp, effective_target),
                 )
+                await self._call("set_hvac_mode", {"entity_id": eid, "hvac_mode": "cool"})
             for eid in thermostats:
                 if eid in _forced_off:
                     await async_idle_device(self.hass, eid, self._devices, area_id=self._area_id, targets=targets)

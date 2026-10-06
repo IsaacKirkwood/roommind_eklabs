@@ -1108,6 +1108,8 @@ async def test_apply_cooling_promotes_mislabelled_heat_cool_climate():
     ]
     assert any(call[0][1] == "set_hvac_mode" and call[0][2]["hvac_mode"] == "cool" for call in calls)
     assert not any(call[0][1] == "set_hvac_mode" and call[0][2]["hvac_mode"] == "heat" for call in calls)
+    assert calls[-1][0][1] == "set_hvac_mode"
+    assert calls[-1][0][2]["hvac_mode"] == "cool"
 
 
 @pytest.mark.asyncio
