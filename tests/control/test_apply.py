@@ -1076,6 +1076,41 @@ async def test_apply_cooling_turns_off_thermostats():
 
 
 @pytest.mark.asyncio
+async def test_apply_cooling_promotes_mislabelled_heat_cool_climate():
+    """A TRV-labelled climate with a real cool mode receives cool, not heat."""
+    hass = build_hass()
+    state = MagicMock()
+    state.state = "heat"
+    state.attributes = {
+        "hvac_modes": ["off", "cool", "heat"],
+        "current_temperature": 24.0,
+        "temperature": 17.0,
+        "min_temp": 1.0,
+        "max_temp": 37.0,
+    }
+    hass.states.get.return_value = state
+    room = make_room(thermostats=["climate.dyson"], acs=[], climate_mode="auto")
+    ctrl = MPCController(
+        hass,
+        room,
+        model_manager=RoomModelManager(),
+        outdoor_temp=30.0,
+        settings={},
+        has_external_sensor=True,
+    )
+
+    await ctrl.async_apply("cooling", target_temp=22.0, current_temp=24.0, power_fraction=1.0)
+
+    calls = [
+        call
+        for call in hass.services.async_call.call_args_list
+        if call[0][2].get("entity_id") == "climate.dyson"
+    ]
+    assert any(call[0][1] == "set_hvac_mode" and call[0][2]["hvac_mode"] == "cool" for call in calls)
+    assert not any(call[0][1] == "set_hvac_mode" and call[0][2]["hvac_mode"] == "heat" for call in calls)
+
+
+@pytest.mark.asyncio
 async def test_apply_managed_mode_ac_heat_only():
     """Managed mode AC with only 'heat' mode gets heat + target temp."""
     hass = build_hass()

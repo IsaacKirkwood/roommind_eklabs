@@ -52,6 +52,7 @@ from .control.mpc_controller import (
     MPCController,
     check_acs_can_heat,
     get_can_heat_cool,
+    get_runtime_cooling_eids,
     is_mpc_active,
 )
 from .control.solar import compute_q_solar_norm
@@ -1381,7 +1382,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
 
         ac_min_temps: list[float] = []
         ac_max_temps: list[float] = []
-        for eid in get_ac_eids(room.get("devices", [])):
+        for eid in get_runtime_cooling_eids(self.hass, room.get("devices", [])):
             st = self.hass.states.get(eid)
             if st:
                 if st.attributes.get("min_temp") is not None:
@@ -1465,7 +1466,9 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             # transition when all cooling-capable devices are blocked.  In heating
             # mode both TRVs and ACs can contribute, so the full device set applies.
             _mode_relevant_eids = (
-                set(get_ac_eids(room.get("devices", []))) if mode == MODE_COOLING else set(all_device_eids)
+                set(get_runtime_cooling_eids(self.hass, room.get("devices", [])))
+                if mode == MODE_COOLING
+                else set(all_device_eids)
             )
             if compressor_forced_off and _mode_relevant_eids and compressor_forced_off >= _mode_relevant_eids:
                 mode = MODE_IDLE
@@ -1590,6 +1593,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                     self.outdoor_temp_effective,
                     acs_can_heat=check_acs_can_heat(self.hass, room),
                     override_active=is_override_active(room),
+                    cooling_available=bool(get_runtime_cooling_eids(self.hass, room.get("devices", []))),
                 )
                 _T_out = (
                     self.outdoor_temp_effective
@@ -1795,7 +1799,11 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             and current_temp_raw is not None
             and self.outdoor_temp_effective is not None
         ):
-            can_heat, can_cool = get_can_heat_cool(room, acs_can_heat=check_acs_can_heat(self.hass, room))
+            can_heat, can_cool = get_can_heat_cool(
+                room,
+                acs_can_heat=check_acs_can_heat(self.hass, room),
+                cooling_available=bool(get_runtime_cooling_eids(self.hass, room.get("devices", []))),
+            )
             self._ekf_training.process(
                 area_id=area_id,
                 current_temp=current_temp_raw,
@@ -1898,7 +1906,9 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         # though async_apply() (see mpc_controller) already sends the correct
         # direct target to the AC. (#device_setpoint mixed-mode display bug)
         _mode_relevant_eids: set[str] = (
-            set(get_ac_eids(_room_devices)) if mode == MODE_COOLING else set(get_all_entity_ids(_room_devices))
+            set(get_runtime_cooling_eids(self.hass, _room_devices))
+            if mode == MODE_COOLING
+            else set(get_all_entity_ids(_room_devices))
         )
         _all_direct = bool(_mode_relevant_eids) and _mode_relevant_eids <= _direct_eids
 
@@ -1934,8 +1944,11 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                 has_external_sensor,
                 device_max_temp=device_max_temp,
                 device_min_temp=device_min_temp,
-                has_thermostats=bool(get_trv_eids(_room_devices)),
-                has_acs=bool(get_ac_eids(_room_devices)),
+                has_thermostats=bool(
+                    set(get_trv_eids(_room_devices))
+                    - set(get_runtime_cooling_eids(self.hass, _room_devices))
+                ),
+                has_acs=bool(get_runtime_cooling_eids(self.hass, _room_devices)),
                 all_direct=_all_direct,
             ),
             "window_open": window_open,

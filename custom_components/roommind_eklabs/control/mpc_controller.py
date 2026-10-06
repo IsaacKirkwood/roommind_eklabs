@@ -644,6 +644,24 @@ def check_acs_can_heat(hass: HomeAssistant, room_config: dict) -> bool:
     return False
 
 
+def get_runtime_cooling_eids(hass: HomeAssistant, devices: list[dict]) -> list[str]:
+    """Return devices that can actually cool, including mislabelled climates.
+
+    Older RoomMind configurations may have heat-and-cool appliances saved as
+    TRVs.  Trust an entity's explicit ``cool`` HVAC mode over that stale label
+    so appliances such as Dyson Hot+Cool units receive a real cool command.
+    """
+    cooling_eids = list(get_ac_eids(devices))
+    seen = set(cooling_eids)
+    for eid in get_trv_eids(devices):
+        state = hass.states.get(eid)
+        modes = state.attributes.get("hvac_modes", []) if state is not None else []
+        if "cool" in modes and eid not in seen:
+            cooling_eids.append(eid)
+            seen.add(eid)
+    return cooling_eids
+
+
 def get_can_heat_cool(
     room_config: dict,
     outdoor_temp: float | None = None,
@@ -652,6 +670,7 @@ def get_can_heat_cool(
     acs_can_heat: bool = False,
     *,
     override_active: bool = False,
+    cooling_available: bool | None = None,
 ) -> tuple[bool, bool]:
     """Determine whether heating/cooling are allowed for a room.
 
@@ -669,7 +688,9 @@ def get_can_heat_cool(
     can_heat = climate_mode != CLIMATE_MODE_COOL_ONLY and (
         bool(get_trv_eids(room_config.get("devices", []))) or acs_can_heat
     )
-    can_cool = climate_mode != CLIMATE_MODE_HEAT_ONLY and bool(get_ac_eids(room_config.get("devices", [])))
+    if cooling_available is None:
+        cooling_available = bool(get_ac_eids(room_config.get("devices", [])))
+    can_cool = climate_mode != CLIMATE_MODE_HEAT_ONLY and cooling_available
 
     if outdoor_temp is not None and not override_active:
         if outdoor_temp > outdoor_heating_max:
@@ -739,8 +760,10 @@ class MPCController:
     ) -> None:
         self.hass = hass
         self.room_config = room_config
-        self.thermostats: list[str] = get_trv_eids(room_config.get("devices", []))
-        self.acs: list[str] = get_ac_eids(room_config.get("devices", []))
+        devices = room_config.get("devices", [])
+        self.acs: list[str] = get_runtime_cooling_eids(hass, devices)
+        cooling_eids = set(self.acs)
+        self.thermostats: list[str] = [eid for eid in get_trv_eids(devices) if eid not in cooling_eids]
         self._devices: list[dict] = room_config.get("devices", [])
         self._direct_eids: set[str] = get_direct_setpoint_eids(self._devices)
         self.climate_mode: str = room_config.get("climate_mode", "auto")
@@ -1098,6 +1121,7 @@ class MPCController:
             self.outdoor_heating_max,
             acs_can_heat=check_acs_can_heat(self.hass, self.room_config),
             override_active=_override,
+            cooling_available=bool(self.acs),
         )
 
         if self.outdoor_temp is not None:
