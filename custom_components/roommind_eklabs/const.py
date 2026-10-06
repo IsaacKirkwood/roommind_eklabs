@@ -1,13 +1,18 @@
 """Constants for the RoomMind integration."""
 
+import json
 import time
+from pathlib import Path
 from typing import NamedTuple
 
 from homeassistant.const import Platform
 from homeassistant.core import Context
 
 DOMAIN = "roommind_eklabs"
-VERSION = "0.8.0"
+
+# Read once at import. A live HACS install changes the manifest on disk while
+# the running process keeps this original value until Home Assistant restarts.
+VERSION = str(json.loads((Path(__file__).parent / "manifest.json").read_text())["version"])
 
 # Platforms
 PLATFORMS = [Platform.SENSOR, Platform.SWITCH, Platform.BINARY_SENSOR, Platform.CLIMATE]

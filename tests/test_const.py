@@ -2,13 +2,24 @@
 
 from __future__ import annotations
 
+import json
 import time
+from pathlib import Path
 
 from custom_components.roommind_eklabs.const import (
+    VERSION,
     build_override_live,
     is_override_active,
     is_override_suppressed,
 )
+
+
+def test_runtime_version_matches_manifest():
+    """The restart repair clears after HA loads a newly installed release."""
+    manifest_path = Path(__file__).parents[1] / "custom_components" / "roommind_eklabs" / "manifest.json"
+    manifest_version = json.loads(manifest_path.read_text())["version"]
+
+    assert VERSION == manifest_version
 
 
 class TestIsOverrideActive:
