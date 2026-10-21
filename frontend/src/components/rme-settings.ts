@@ -190,13 +190,13 @@ export class RsSettings extends LitElement {
       const savedAverage = s.whole_house_average as
         (WholeHouseAverage & { humidity_sensor?: string }) | undefined;
       this._wholeHouseAverage = savedAverage
-        ? {
+        ? this._cleanWholeHouseAverage({
             ...savedAverage,
             humidity_sensors:
               savedAverage.humidity_sensors ??
               (savedAverage.humidity_sensor ? [savedAverage.humidity_sensor] : []),
             humidity_offsets: savedAverage.humidity_offsets ?? {},
-          }
+          })
         : {
             temperature_sensors: this._wholeHousePlant.temperature_sensors.length
               ? this._wholeHousePlant.temperature_sensors
@@ -535,6 +535,9 @@ export class RsSettings extends LitElement {
         (source) => source.entity_id && source.rooms.length > 0,
       );
     }
+    if (key === "wholeHouseAverage") {
+      value = this._cleanWholeHouseAverage(value as WholeHouseAverage);
+    }
     if (key === "moldNotificationTargets") {
       value = (value as NotificationTarget[]).filter((target) => target.entity_id);
       return {
@@ -552,6 +555,18 @@ export class RsSettings extends LitElement {
     }
 
     return { [backendKey]: value };
+  }
+
+  private _cleanWholeHouseAverage(value: WholeHouseAverage): WholeHouseAverage {
+    return {
+      temperature_sensors: [...new Set(value.temperature_sensors ?? [])],
+      temperature_offsets: value.temperature_offsets ?? {},
+      humidity_sensors: [...new Set(value.humidity_sensors ?? [])],
+      humidity_offsets: value.humidity_offsets ?? {},
+      home_presence_entities: [...new Set(value.home_presence_entities ?? [])],
+      occupancy_entities: [...new Set(value.occupancy_entities ?? [])],
+      media_player_entities: [...new Set(value.media_player_entities ?? [])],
+    };
   }
 
   /**

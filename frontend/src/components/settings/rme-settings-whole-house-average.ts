@@ -99,7 +99,9 @@ export class RmeSettingsWholeHouseAverage extends LitElement {
         label=${label}
         @value-changed=${(e: CustomEvent) => {
           const id = e.detail?.value;
-          if (id) this._set(key, [...new Set([...entities, id])]);
+          if (!id) return;
+          this._set(key, [...new Set([...entities, id])]);
+          (e.target as HTMLElement & { value?: string }).value = "";
         }}
       ></ha-entity-picker>
       ${
