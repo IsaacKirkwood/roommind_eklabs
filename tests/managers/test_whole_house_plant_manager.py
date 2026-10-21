@@ -32,11 +32,43 @@ def _evaluate(manager, **overrides):
     return manager.evaluate(**values)
 
 
-def test_evaporative_cooling_starts_from_temperature_demand():
+def test_fresh_air_is_preferred_for_temperature_demand():
     manager = WholeHousePlantManager(WholeHousePlantConfig("climate.magiqtouch_zone_1"))
     plan = _evaluate(manager)
-    assert plan.mode == MODE_COOL
+    assert plan.mode == MODE_VENTILATE
     assert plan.cooling_allowed is True
+    assert plan.fresh_air_suitable is True
+    assert plan.reason == "fresh air preferred for cooling"
+
+
+def test_evaporative_cooling_is_used_when_outside_is_above_fresh_air_limit():
+    manager = WholeHousePlantManager(WholeHousePlantConfig("climate.magiqtouch_zone_1"))
+    plan = _evaluate(manager, outdoor_temperature=25.0)
+    assert plan.mode == MODE_COOL
+    assert plan.fresh_air_suitable is False
+
+
+def test_evaporative_cooling_is_used_when_outside_is_too_humid_for_fresh_air():
+    manager = WholeHousePlantManager(
+        WholeHousePlantConfig(
+            "climate.magiqtouch_zone_1",
+            fresh_air_max_outdoor_humidity=55.0,
+            evaporative_max_outdoor_humidity=70.0,
+        )
+    )
+    plan = _evaluate(manager, outdoor_humidity=60.0)
+    assert plan.mode == MODE_COOL
+
+
+def test_fresh_air_requires_outside_to_be_cooler_than_inside():
+    manager = WholeHousePlantManager(
+        WholeHousePlantConfig(
+            "climate.magiqtouch_zone_1",
+            fresh_air_max_outdoor_temperature=30.0,
+        )
+    )
+    plan = _evaluate(manager, indoor_temperature=27.0, outdoor_temperature=28.0)
+    assert plan.mode == MODE_COOL
 
 
 def test_hot_dry_air_uses_wet_bulb_advantage():
@@ -92,21 +124,22 @@ def test_evaporative_cooling_stops_at_indoor_humidity_limit_and_waits_for_margin
             evaporative_humidity_resume_delta=5.0,
         )
     )
-    _evaluate(manager, indoor_humidity=60.0, now=1000)
+    _evaluate(manager, indoor_humidity=60.0, outdoor_temperature=25.0, now=1000)
     stopped = _evaluate(
         manager,
         indoor_humidity=70.0,
+        outdoor_temperature=25.0,
         reported_mode=MODE_COOL,
         now=1100,
     )
     assert stopped.mode == MODE_OFF
     assert stopped.reason == "indoor humidity limit reached"
 
-    waiting = _evaluate(manager, indoor_humidity=68.0, now=1200)
+    waiting = _evaluate(manager, indoor_humidity=68.0, outdoor_temperature=25.0, now=1200)
     assert waiting.mode == MODE_OFF
     assert waiting.reason == "waiting for indoor humidity to fall"
 
-    restarted = _evaluate(manager, indoor_humidity=65.0, now=1300)
+    restarted = _evaluate(manager, indoor_humidity=65.0, outdoor_temperature=25.0, now=1300)
     assert restarted.mode == MODE_COOL
 
 
@@ -129,15 +162,15 @@ def test_nobody_home_blocks_cooling_and_ventilation():
 def test_unchanged_available_feedback_is_not_treated_as_stale():
     manager = WholeHousePlantManager(WholeHousePlantConfig("climate.plant"))
     plan = _evaluate(manager, feedback_age_seconds=181)
-    assert plan.mode == MODE_COOL
+    assert plan.mode == MODE_VENTILATE
     assert plan.fault is None
 
 
 def test_command_mismatch_becomes_fault_after_timeout():
     manager = WholeHousePlantManager(WholeHousePlantConfig("climate.plant", feedback_timeout_seconds=120))
-    _evaluate(manager, now=1000)
-    pending = _evaluate(manager, reported_mode=MODE_OFF, now=1010)
-    faulted = _evaluate(manager, reported_mode=MODE_OFF, now=1131)
+    _evaluate(manager, outdoor_temperature=25.0, now=1000)
+    pending = _evaluate(manager, outdoor_temperature=25.0, reported_mode=MODE_OFF, now=1010)
+    faulted = _evaluate(manager, outdoor_temperature=25.0, reported_mode=MODE_OFF, now=1131)
     assert pending.fault is None
     assert faulted.mode == MODE_OFF
     assert faulted.fault == "plant failed to follow command"
@@ -145,8 +178,8 @@ def test_command_mismatch_becomes_fault_after_timeout():
 
 def test_maximum_runtime_stops_plant():
     manager = WholeHousePlantManager(WholeHousePlantConfig("climate.plant", max_continuous_runtime_minutes=10))
-    _evaluate(manager, now=1000)
-    plan = _evaluate(manager, reported_mode=MODE_COOL, now=1601)
+    _evaluate(manager, outdoor_temperature=25.0, now=1000)
+    plan = _evaluate(manager, outdoor_temperature=25.0, reported_mode=MODE_COOL, now=1601)
     assert plan.mode == MODE_OFF
     assert plan.fault == "maximum runtime exceeded"
 
@@ -155,9 +188,9 @@ def test_cooling_holds_for_minimum_run_then_stops_at_target():
     manager = WholeHousePlantManager(
         WholeHousePlantConfig("climate.plant", minimum_cooling_run_minutes=30)
     )
-    started = _evaluate(manager, now=1000)
-    held = _evaluate(manager, indoor_temperature=24.0, reported_mode=MODE_COOL, now=1600)
-    stopped = _evaluate(manager, indoor_temperature=24.0, reported_mode=MODE_COOL, now=2801)
+    started = _evaluate(manager, outdoor_temperature=25.0, now=1000)
+    held = _evaluate(manager, indoor_temperature=24.0, outdoor_temperature=25.0, reported_mode=MODE_COOL, now=1600)
+    stopped = _evaluate(manager, indoor_temperature=24.0, outdoor_temperature=25.0, reported_mode=MODE_COOL, now=2801)
     assert started.mode == MODE_COOL
     assert held.mode == MODE_COOL
     assert held.reason == "minimum cooling run"
@@ -183,9 +216,9 @@ def test_cooling_fan_speed_scales_with_temperature_demand():
             cooling_fan_max_speed=10,
         )
     )
-    low = _evaluate(manager, indoor_temperature=24.5, now=1000)
+    low = _evaluate(manager, indoor_temperature=24.5, outdoor_temperature=25.0, now=1000)
     manager = WholeHousePlantManager(manager.config)
-    high = _evaluate(manager, indoor_temperature=28.0, now=1000)
+    high = _evaluate(manager, indoor_temperature=28.0, outdoor_temperature=25.0, now=1000)
     assert low.fan_speed == 4
     assert high.fan_speed == 10
 
@@ -194,7 +227,7 @@ def test_safety_gate_overrides_minimum_run():
     manager = WholeHousePlantManager(
         WholeHousePlantConfig("climate.plant", minimum_cooling_run_minutes=30)
     )
-    _evaluate(manager, now=1000)
+    _evaluate(manager, outdoor_temperature=25.0, now=1000)
     plan = _evaluate(manager, reported_mode=MODE_COOL, home_occupied=False, now=1100)
     assert plan.mode == MODE_OFF
 
@@ -208,7 +241,7 @@ def test_evaporative_cooling_can_require_an_exhaust_path():
     assert blocked.reason == "open an exhaust path"
 
     manager = WholeHousePlantManager(manager.config)
-    allowed = _evaluate(manager, exhaust_ready=True)
+    allowed = _evaluate(manager, exhaust_ready=True, outdoor_temperature=25.0)
     assert allowed.mode == MODE_COOL
 
 
@@ -228,13 +261,19 @@ def test_outdoor_air_quality_lockout_stops_cooling_and_fan():
 
 def test_mpc_forecast_can_start_cooling_before_threshold():
     manager = WholeHousePlantManager(WholeHousePlantConfig("climate.plant", cooling_target=24.0))
-    fallback = _evaluate(manager, indoor_temperature=24.2, predicted_temperature=25.0)
+    fallback = _evaluate(
+        manager,
+        indoor_temperature=24.2,
+        outdoor_temperature=25.0,
+        predicted_temperature=25.0,
+    )
     assert fallback.mode == MODE_OFF
 
     manager = WholeHousePlantManager(manager.config)
     predictive = _evaluate(
         manager,
         indoor_temperature=24.2,
+        outdoor_temperature=25.0,
         predicted_temperature=25.0,
         mpc_cooling_active=True,
     )
@@ -246,10 +285,11 @@ def test_running_cooling_stops_from_measurement_not_idle_forecast():
     manager = WholeHousePlantManager(
         WholeHousePlantConfig("climate.plant", cooling_target=24.0, minimum_cooling_run_minutes=0)
     )
-    _evaluate(manager, indoor_temperature=26.0, now=1000)
+    _evaluate(manager, indoor_temperature=26.0, outdoor_temperature=25.0, now=1000)
     stopped = _evaluate(
         manager,
         indoor_temperature=24.1,
+        outdoor_temperature=25.0,
         predicted_temperature=26.0,
         mpc_cooling_active=True,
         reported_mode=MODE_COOL,

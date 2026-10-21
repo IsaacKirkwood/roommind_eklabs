@@ -613,6 +613,12 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             cooling_target=float(raw.get("cooling_target", 24.0)),
             cooling_start_delta=float(raw.get("cooling_start_delta", 0.5)),
             cooling_stop_delta=float(raw.get("cooling_stop_delta", 0.2)),
+            fresh_air_max_outdoor_temperature=float(
+                raw.get("fresh_air_max_outdoor_temperature", 22.0)
+            ),
+            fresh_air_max_outdoor_humidity=float(
+                raw.get("fresh_air_max_outdoor_humidity", 70.0)
+            ),
             minimum_outdoor_cooling_temp=float(raw.get("minimum_outdoor_cooling_temp", 18.0)),
             evaporative_max_outdoor_humidity=float(raw.get("evaporative_max_outdoor_humidity", 70.0)),
             evaporative_max_indoor_humidity=float(raw.get("evaporative_max_indoor_humidity", 70.0)),
@@ -722,6 +728,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             "fault": plan.fault,
             "cooling_allowed": plan.cooling_allowed,
             "ventilation_allowed": plan.ventilation_allowed,
+            "fresh_air_suitable": plan.fresh_air_suitable,
             "current_temperature": indoor_temperature,
             "current_humidity": indoor_humidity,
             "outdoor_aqi": outdoor_aqi,

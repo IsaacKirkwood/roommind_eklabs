@@ -65,7 +65,9 @@ async def test_plant_commands_evaporative_cooling(hass, mock_config_entry):
     hass.states.get.side_effect = states.get
     hass.services.async_call = AsyncMock()
 
-    await coordinator._async_control_whole_house_plant({}, _settings())
+    await coordinator._async_control_whole_house_plant(
+        {}, _settings(fresh_air_max_outdoor_temperature=20.0)
+    )
 
     hass.services.async_call.assert_has_awaits(
         [

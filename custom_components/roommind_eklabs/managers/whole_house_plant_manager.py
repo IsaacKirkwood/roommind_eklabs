@@ -41,6 +41,8 @@ class WholeHousePlantConfig:
     cooling_target: float = 24.0
     cooling_start_delta: float = 0.5
     cooling_stop_delta: float = 0.2
+    fresh_air_max_outdoor_temperature: float = 22.0
+    fresh_air_max_outdoor_humidity: float = 70.0
     minimum_outdoor_cooling_temp: float = 18.0
     evaporative_max_outdoor_humidity: float = 70.0
     evaporative_max_indoor_humidity: float = 70.0
@@ -80,6 +82,7 @@ class WholeHousePlantPlan:
     fault: str | None
     cooling_allowed: bool
     ventilation_allowed: bool
+    fresh_air_suitable: bool
     fan_speed: int | None
     fan_speed_changed: bool
 
@@ -131,6 +134,12 @@ class WholeHousePlantManager:
             and feedback_available
             and not fault
         )
+        fresh_air_suitable = self._fresh_air_suitable(
+            indoor_temperature,
+            outdoor_temperature,
+            outdoor_humidity,
+            ventilation_allowed,
+        )
 
         desired = MODE_OFF
         reason = "idle"
@@ -161,7 +170,7 @@ class WholeHousePlantManager:
                 reason = "cooling selected"
             else:
                 reason = cooling_reason
-        elif cooling_allowed and indoor_temperature is not None:
+        elif indoor_temperature is not None:
             start_temperature = (
                 max(indoor_temperature, predicted_temperature)
                 if mpc_cooling_active and predicted_temperature is not None
@@ -172,8 +181,17 @@ class WholeHousePlantManager:
             else:
                 cooling_demand = start_temperature >= self.config.cooling_target + self.config.cooling_start_delta
             if cooling_demand:
-                desired = MODE_COOL
-                reason = "whole-house cooling demand"
+                if fresh_air_suitable:
+                    desired = MODE_VENTILATE
+                    reason = "fresh air preferred for cooling"
+                elif cooling_allowed:
+                    desired = MODE_COOL
+                    reason = "evaporative cooling demand"
+                elif ventilation_requested and ventilation_allowed:
+                    desired = MODE_VENTILATE
+                    reason = f"fresh-air request; cooling blocked: {cooling_reason}"
+                else:
+                    reason = cooling_reason
             elif ventilation_requested and ventilation_allowed:
                 desired = MODE_VENTILATE
                 reason = "fresh-air request"
@@ -211,8 +229,30 @@ class WholeHousePlantManager:
             fault=fault,
             cooling_allowed=cooling_allowed,
             ventilation_allowed=ventilation_allowed,
+            fresh_air_suitable=fresh_air_suitable,
             fan_speed=fan_speed,
             fan_speed_changed=fan_speed_changed,
+        )
+
+    def _fresh_air_suitable(
+        self,
+        indoor_temperature: float | None,
+        outdoor_temperature: float | None,
+        outdoor_humidity: float | None,
+        ventilation_allowed: bool,
+    ) -> bool:
+        """Return whether outside air can satisfy cooling demand without water."""
+        if (
+            not ventilation_allowed
+            or indoor_temperature is None
+            or outdoor_temperature is None
+            or outdoor_humidity is None
+        ):
+            return False
+        return (
+            outdoor_temperature < indoor_temperature
+            and outdoor_temperature <= self.config.fresh_air_max_outdoor_temperature
+            and outdoor_humidity <= self.config.fresh_air_max_outdoor_humidity
         )
 
     def _minimum_run_active(self, now: float, cooling_allowed: bool) -> bool:

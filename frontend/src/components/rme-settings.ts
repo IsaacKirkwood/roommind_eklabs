@@ -90,6 +90,8 @@ export class RsSettings extends LitElement {
     cooling_target: 24,
     cooling_start_delta: 0.5,
     cooling_stop_delta: 0.2,
+    fresh_air_max_outdoor_temperature: 22,
+    fresh_air_max_outdoor_humidity: 70,
     minimum_outdoor_cooling_temp: 18,
     evaporative_max_outdoor_humidity: 70,
     evaporative_max_indoor_humidity: 70,
@@ -184,8 +186,11 @@ export class RsSettings extends LitElement {
       this._moldPreventionIntensity = s.mold_prevention_intensity ?? "medium";
       this._moldPreventionNotify = s.mold_prevention_notify_enabled ?? false;
       this._compressorGroups = s.compressor_groups ?? [];
-      this._sharedHeatSources = s.shared_heat_sources ?? [];
-      this._wholeHousePlant = { ...this._wholeHousePlant, ...(s.whole_house_plant ?? {}) };
+      this._sharedHeatSources = this._cleanSharedHeatSources(s.shared_heat_sources ?? []);
+      this._wholeHousePlant = this._cleanWholeHousePlant({
+        ...this._wholeHousePlant,
+        ...(s.whole_house_plant ?? {}),
+      });
       const legacyHeat = this._sharedHeatSources[0];
       const savedAverage = s.whole_house_average as
         (WholeHouseAverage & { humidity_sensor?: string }) | undefined;
@@ -369,7 +374,7 @@ export class RsSettings extends LitElement {
       <rme-settings-panel
         icon="mdi:weather-windy"
         .heading=${"Whole-house cooling & fresh air"}
-        .intro=${"Control one whole-house MagIQtouch evaporative zone with weather, presence, and gas-heating interlocks."}
+        .intro=${"Prefer efficient outside-air cooling when conditions suit, then use evaporative cooling with weather, air-quality, presence, and heating interlocks."}
       >
         <rme-settings-whole-house-plant
           .hass=${this.hass}
@@ -531,9 +536,12 @@ export class RsSettings extends LitElement {
       value = (value as CompressorGroup[]).filter((group) => group.members.length > 0);
     }
     if (key === "sharedHeatSources") {
-      value = (value as SharedHeatSource[]).filter(
+      value = this._cleanSharedHeatSources(value as SharedHeatSource[]).filter(
         (source) => source.entity_id && source.rooms.length > 0,
       );
+    }
+    if (key === "wholeHousePlant") {
+      value = this._cleanWholeHousePlant(value as WholeHousePlant);
     }
     if (key === "wholeHouseAverage") {
       value = this._cleanWholeHouseAverage(value as WholeHouseAverage);
@@ -567,6 +575,20 @@ export class RsSettings extends LitElement {
       occupancy_entities: [...new Set(value.occupancy_entities ?? [])],
       media_player_entities: [...new Set(value.media_player_entities ?? [])],
     };
+  }
+
+  private _cleanWholeHousePlant(value: WholeHousePlant): WholeHousePlant {
+    const { live: _live, ...stored } = value;
+    return {
+      ...stored,
+      ventilation_request_entities: [...new Set(stored.ventilation_request_entities ?? [])],
+      exhaust_ready_entities: [...new Set(stored.exhaust_ready_entities ?? [])],
+      outdoor_air_lockout_entities: [...new Set(stored.outdoor_air_lockout_entities ?? [])],
+    };
+  }
+
+  private _cleanSharedHeatSources(value: SharedHeatSource[]): SharedHeatSource[] {
+    return value.map(({ live: _live, ...source }) => source);
   }
 
   /**

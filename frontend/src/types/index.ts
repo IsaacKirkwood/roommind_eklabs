@@ -162,6 +162,8 @@ export interface WholeHousePlant {
   cooling_target: number;
   cooling_start_delta: number;
   cooling_stop_delta: number;
+  fresh_air_max_outdoor_temperature: number;
+  fresh_air_max_outdoor_humidity: number;
   minimum_outdoor_cooling_temp: number;
   evaporative_max_outdoor_humidity: number;
   evaporative_max_indoor_humidity: number;
@@ -198,6 +200,8 @@ export interface WholeHousePlant {
     outdoor_aqi?: number | null;
     outdoor_air_safe?: boolean;
     cooling_allowed?: boolean;
+    ventilation_allowed?: boolean;
+    fresh_air_suitable?: boolean;
     fan_speed?: number | null;
     predicted_temperature?: number | null;
     mpc_heating_active?: boolean;

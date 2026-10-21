@@ -797,6 +797,12 @@ async def websocket_get_settings(
             vol.Optional("cooling_target", default=24.0): vol.All(vol.Coerce(float), vol.Range(min=16, max=35)),
             vol.Optional("cooling_start_delta", default=0.5): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=5)),
             vol.Optional("cooling_stop_delta", default=0.2): vol.All(vol.Coerce(float), vol.Range(min=0, max=5)),
+            vol.Optional("fresh_air_max_outdoor_temperature", default=22.0): vol.All(
+                vol.Coerce(float), vol.Range(min=0, max=40)
+            ),
+            vol.Optional("fresh_air_max_outdoor_humidity", default=70.0): vol.All(
+                vol.Coerce(float), vol.Range(min=10, max=100)
+            ),
             vol.Optional("minimum_outdoor_cooling_temp", default=18.0): vol.All(
                 vol.Coerce(float), vol.Range(min=0, max=40)
             ),
