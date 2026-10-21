@@ -649,11 +649,11 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         average = self._whole_house_average_settings(settings)
         humidity_values: list[float] = []
         humidity_offsets = average.get("humidity_offsets", {})
-        for entity_id in average.get("humidity_sensors", []):
-            value = read_sensor_value(self.hass, entity_id, "whole_house_plant", "humidity")
+        for humidity_entity_id in average.get("humidity_sensors", []):
+            value = read_sensor_value(self.hass, humidity_entity_id, "whole_house_plant", "humidity")
             if value is not None:
                 humidity_values.append(
-                    min(100.0, max(0.0, value + float(humidity_offsets.get(entity_id, 0.0))))
+                    min(100.0, max(0.0, value + float(humidity_offsets.get(humidity_entity_id, 0.0))))
                 )
         indoor_humidity = sum(humidity_values) / len(humidity_values) if humidity_values else None
         occupied = any(

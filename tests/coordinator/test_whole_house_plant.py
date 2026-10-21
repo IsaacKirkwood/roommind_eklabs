@@ -256,6 +256,12 @@ async def test_plant_averages_corrected_humidity_sensors(hass, mock_config_entry
     await coordinator._async_control_whole_house_plant({}, settings)
 
     assert coordinator._whole_house_plant_live["current_humidity"] == 50.0
+    assert coordinator._whole_house_plant_live["entity_id"] == "climate.magiqtouch_zone_1"
+    assert hass.services.async_call.await_args_list
+    assert all(
+        item.args[2]["entity_id"] == "climate.magiqtouch_zone_1"
+        for item in hass.services.async_call.await_args_list
+    )
 
 
 @pytest.mark.asyncio
