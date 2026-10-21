@@ -128,6 +128,8 @@ export class RsSettings extends LitElement {
   @state() private _loaded = false;
 
   private _saveDebounce?: ReturnType<typeof setTimeout>;
+  private _pendingChanges: Record<string, unknown> = {};
+  private _saving = false;
 
   connectedCallback() {
     super.connectedCallback();
@@ -461,7 +463,95 @@ export class RsSettings extends LitElement {
   private _onSettingChanged(e: CustomEvent<{ key: string; value: unknown }>) {
     const { key, value } = e.detail;
     (this as Record<string, unknown>)[`_${key}`] = value;
+    Object.assign(this._pendingChanges, this._saveChange(key, value));
     this._autoSave();
+  }
+
+  private _saveChange(key: string, value: unknown): Record<string, unknown> {
+    const backendKeys: Record<string, string> = {
+      groupByFloor: "group_by_floor",
+      climateControlActive: "climate_control_active",
+      learningDisabledRooms: "learning_disabled_rooms",
+      outdoorTempSensor: "outdoor_temp_sensor",
+      outdoorHumiditySensor: "outdoor_humidity_sensor",
+      outdoorCoolingMin: "outdoor_cooling_min",
+      outdoorHeatingMax: "outdoor_heating_max",
+      controlMode: "control_mode",
+      comfortWeight: "comfort_weight",
+      weatherEntity: "weather_entity",
+      outdoorUnavailableNotify: "outdoor_unavailable_notify",
+      predictionEnabled: "prediction_enabled",
+      vacationTemp: "vacation_temp",
+      presenceEnabled: "presence_enabled",
+      presencePersons: "presence_persons",
+      presenceAwayAction: "presence_away_action",
+      presenceClearsOverride: "presence_clears_override",
+      scheduleOffAction: "schedule_off_action",
+      valveProtectionEnabled: "valve_protection_enabled",
+      valveProtectionInterval: "valve_protection_interval_days",
+      compressorGroups: "compressor_groups",
+      sharedHeatSources: "shared_heat_sources",
+      wholeHousePlant: "whole_house_plant",
+      wholeHouseAverage: "whole_house_average",
+      coilDryEnabled: "coil_dry_enabled",
+      coilDryMinutes: "coil_dry_minutes",
+      coilDryMode: "coil_dry_mode",
+      coilDryFanMode: "coil_dry_fan_mode",
+      coilDryMinCoolingMinutes: "coil_dry_min_cooling_minutes",
+      coilDryDrainMinutes: "coil_dry_drain_minutes",
+      moldDetectionEnabled: "mold_detection_enabled",
+      moldHumidityThreshold: "mold_humidity_threshold",
+      moldSustainedMinutes: "mold_sustained_minutes",
+      moldNotificationCooldown: "mold_notification_cooldown",
+      moldNotificationsEnabled: "mold_notifications_enabled",
+      moldNotificationTargets: "mold_notification_targets",
+      moldPreventionEnabled: "mold_prevention_enabled",
+      moldPreventionIntensity: "mold_prevention_intensity",
+      moldPreventionNotify: "mold_prevention_notify_enabled",
+    };
+
+    if (key === "vacationActive" || key === "vacationUntil") {
+      return {
+        vacation_until: this._vacationActive
+          ? this._vacationUntil
+            ? new Date(this._vacationUntil).getTime() / 1000
+            : VACATION_SENTINEL
+          : null,
+      };
+    }
+
+    const backendKey = backendKeys[key];
+    if (!backendKey) {
+      console.error(`[RoomMind] Unknown settings field: ${key}`);
+      return {};
+    }
+
+    if (key === "presencePersons") value = (value as string[]).filter(Boolean);
+    if (key === "compressorGroups") {
+      value = (value as CompressorGroup[]).filter((group) => group.members.length > 0);
+    }
+    if (key === "sharedHeatSources") {
+      value = (value as SharedHeatSource[]).filter(
+        (source) => source.entity_id && source.rooms.length > 0,
+      );
+    }
+    if (key === "moldNotificationTargets") {
+      value = (value as NotificationTarget[]).filter((target) => target.entity_id);
+      return {
+        mold_notification_targets: value,
+        ...(this._moldPreventionNotify ? { mold_prevention_notify_targets: value } : {}),
+      };
+    }
+    if (key === "moldPreventionNotify") {
+      return {
+        mold_prevention_notify_enabled: value,
+        mold_prevention_notify_targets: value
+          ? this._moldNotificationTargets.filter((target) => target.entity_id)
+          : [],
+      };
+    }
+
+    return { [backendKey]: value };
   }
 
   /**
@@ -494,64 +584,25 @@ export class RsSettings extends LitElement {
   }
 
   private async _doSave() {
+    if (this._saving || Object.keys(this._pendingChanges).length === 0) return;
+
+    const changes = this._pendingChanges;
+    this._pendingChanges = {};
+    this._saving = true;
     fireSaveStatus(this, "saving");
 
     try {
       await this.hass.callWS({
         type: "roommind_eklabs/settings/save",
-        group_by_floor: this._groupByFloor,
-        climate_control_active: this._climateControlActive,
-        learning_disabled_rooms: this._learningDisabledRooms,
-        outdoor_temp_sensor: this._outdoorTempSensor,
-        outdoor_humidity_sensor: this._outdoorHumiditySensor,
-        outdoor_cooling_min: this._outdoorCoolingMin,
-        outdoor_heating_max: this._outdoorHeatingMax,
-        control_mode: this._controlMode,
-        comfort_weight: this._comfortWeight,
-        weather_entity: this._weatherEntity,
-        outdoor_unavailable_notify: this._outdoorUnavailableNotify,
-        prediction_enabled: this._predictionEnabled,
-        vacation_temp: this._vacationTemp,
-        vacation_until: this._vacationActive
-          ? this._vacationUntil
-            ? new Date(this._vacationUntil).getTime() / 1000
-            : VACATION_SENTINEL
-          : null,
-        presence_enabled: this._presenceEnabled,
-        presence_persons: this._presencePersons.filter((p) => p),
-        presence_away_action: this._presenceAwayAction,
-        presence_clears_override: this._presenceClearsOverride,
-        schedule_off_action: this._scheduleOffAction,
-        valve_protection_enabled: this._valveProtectionEnabled,
-        valve_protection_interval_days: this._valveProtectionInterval,
-        compressor_groups: this._compressorGroups.filter((g) => g.members.length > 0),
-        shared_heat_sources: this._sharedHeatSources.filter(
-          (source) => source.entity_id && source.rooms.length > 0,
-        ),
-        whole_house_plant: this._wholeHousePlant,
-        whole_house_average: this._wholeHouseAverage,
-        coil_dry_enabled: this._coilDryEnabled,
-        coil_dry_minutes: this._coilDryMinutes,
-        coil_dry_mode: this._coilDryMode,
-        coil_dry_fan_mode: this._coilDryFanMode,
-        coil_dry_min_cooling_minutes: this._coilDryMinCoolingMinutes,
-        coil_dry_drain_minutes: this._coilDryDrainMinutes,
-        mold_detection_enabled: this._moldDetectionEnabled,
-        mold_humidity_threshold: this._moldHumidityThreshold,
-        mold_sustained_minutes: this._moldSustainedMinutes,
-        mold_notification_cooldown: this._moldNotificationCooldown,
-        mold_notifications_enabled: this._moldNotificationsEnabled,
-        mold_notification_targets: this._moldNotificationTargets.filter((t) => t.entity_id),
-        mold_prevention_enabled: this._moldPreventionEnabled,
-        mold_prevention_intensity: this._moldPreventionIntensity,
-        mold_prevention_notify_enabled: this._moldPreventionNotify,
-        mold_prevention_notify_targets: this._moldPreventionNotify
-          ? this._moldNotificationTargets.filter((t) => t.entity_id)
-          : [],
+        ...changes,
       });
       fireSaveStatus(this, "saved");
-    } catch {
+    } catch (err) {
+      console.error("[RoomMind] Failed to save settings", err, changes);
       fireSaveStatus(this, "error");
+    } finally {
+      this._saving = false;
+      if (Object.keys(this._pendingChanges).length > 0) this._autoSave();
     }
   }
 

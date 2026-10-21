@@ -555,9 +555,7 @@
         padding: 18px;
         border-radius: 8px;
       }
-      .top,
-      .temperatures,
-      .mode {
+      .top {
         display: flex;
         align-items: center;
       }
@@ -601,6 +599,8 @@
       }
       .plant-section {
         min-width: 0;
+        display: flex;
+        flex-direction: column;
       }
       .plant-section + .plant-section {
         border-left: 1px solid var(--divider-color);
@@ -652,44 +652,28 @@
         white-space: nowrap;
       }
       .mode {
-        gap: 8px;
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(0, 1fr);
+        gap: 0;
+        width: 100%;
       }
       .mode button {
         border: 1px solid var(--divider-color);
         background: transparent;
         color: var(--primary-text-color);
         min-height: 40px;
-        padding: 0 16px;
+        padding: 0 12px;
+        margin-left: -1px;
         cursor: pointer;
         font: inherit;
       }
       .mode button:first-child {
         border-radius: 6px 0 0 6px;
+        margin-left: 0;
       }
       .mode button:last-child {
         border-radius: 0 6px 6px 0;
-        margin-left: -9px;
-      }
-      .cooling-controls {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 12px;
-        align-items: center;
-      }
-      .cooling-controls .mode {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 0;
-      }
-      .cooling-controls .mode button {
-        padding: 0 10px;
-        margin-left: -1px;
-      }
-      .cooling-controls .mode button:first-child {
-        margin-left: 0;
-      }
-      .cooling-controls .mode button:last-child {
-        margin-left: -1px;
       }
       .mode button[active] {
         background: var(--primary-color);
@@ -698,16 +682,21 @@
       }
       .mode button.heating-power {
         display: inline-flex;
+        justify-content: center;
         align-items: center;
         gap: 7px;
-        border-radius: 6px;
-        margin-left: 0;
       }
       .mode .heating-power ha-icon {
         --mdc-icon-size: 18px;
       }
       .temperatures {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 12px;
+        margin-top: 12px;
+      }
+      .temperatures.single {
+        grid-template-columns: minmax(0, 1fr);
       }
       ha-textfield {
         width: 100%;
@@ -726,7 +715,10 @@
           padding-top: 18px;
         }
         .temperatures {
-          align-items: stretch;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .temperatures.single {
+          grid-template-columns: minmax(0, 1fr);
         }
         .override-section {
           grid-column: auto;
@@ -820,37 +812,37 @@
                 ${typeof s?.fan_speed==`number`?h` · Fan ${s.fan_speed}/10`:g}
               </div>
             </div>
-            <div class="cooling-controls">
-              <div class="mode">
-                <button
-                  ?active=${l===`auto`}
-                  ?disabled=${!o?.entity_id}
-                  @click=${()=>this._plantMode(`auto`)}
-                >
-                  Auto
-                </button>
-                <button
-                  ?active=${l===`cool`}
-                  ?disabled=${!o?.entity_id}
-                  @click=${()=>this._plantMode(`cool`)}
-                >
-                  Cool
-                </button>
-                <button
-                  ?active=${l===`fan_only`}
-                  ?disabled=${!o?.entity_id}
-                  @click=${()=>this._plantMode(`fan_only`)}
-                >
-                  Fresh
-                </button>
-                <button
-                  ?active=${l===`off`}
-                  ?disabled=${!o?.entity_id}
-                  @click=${()=>this._plantMode(`off`)}
-                >
-                  Off
-                </button>
-              </div>
+            <div class="mode">
+              <button
+                ?active=${l===`auto`}
+                ?disabled=${!o?.entity_id}
+                @click=${()=>this._plantMode(`auto`)}
+              >
+                Auto
+              </button>
+              <button
+                ?active=${l===`cool`}
+                ?disabled=${!o?.entity_id}
+                @click=${()=>this._plantMode(`cool`)}
+              >
+                Cool
+              </button>
+              <button
+                ?active=${l===`fan_only`}
+                ?disabled=${!o?.entity_id}
+                @click=${()=>this._plantMode(`fan_only`)}
+              >
+                Fresh
+              </button>
+              <button
+                ?active=${l===`off`}
+                ?disabled=${!o?.entity_id}
+                @click=${()=>this._plantMode(`off`)}
+              >
+                Off
+              </button>
+            </div>
+            <div class="temperatures single">
               <ha-textfield
                 type="number"
                 min="16"
@@ -878,11 +870,15 @@
                 <button
                   ?active=${this._overrideMode===`heat`}
                   @click=${()=>this._selectOverrideMode(`heat`)}
-                >Heat</button>
+                >
+                  Heat
+                </button>
                 <button
                   ?active=${this._overrideMode===`cool`}
                   @click=${()=>this._selectOverrideMode(`cool`)}
-                >Cool</button>
+                >
+                  Cool
+                </button>
               </div>
               <ha-textfield
                 type="number"
@@ -7407,7 +7403,7 @@
           gap: 12px;
         }
       }
-    `]}};j([b({attribute:!1})],An.prototype,`hass`,void 0),j([b({attribute:!1})],An.prototype,`rooms`,void 0),j([x()],An.prototype,`_resetSelectedRoom`,void 0),An=j([y(`rme-settings-reset`)],An),v(),S(),M();var Y=class extends _{constructor(...e){super(...e),this.rooms={},this._groupByFloor=!1,this._climateControlActive=!0,this._learningDisabledRooms=[],this._outdoorTempSensor=``,this._outdoorHumiditySensor=``,this._outdoorCoolingMin=16,this._outdoorHeatingMax=22,this._controlMode=`mpc`,this._comfortWeight=70,this._weatherEntity=``,this._outdoorUnavailableNotify=!0,this._predictionEnabled=!0,this._vacationActive=!1,this._vacationTemp=15,this._vacationUntil=``,this._presenceEnabled=!1,this._presencePersons=[],this._presenceAwayAction=`eco`,this._presenceClearsOverride=!1,this._scheduleOffAction=`eco`,this._valveProtectionEnabled=!1,this._valveProtectionInterval=7,this._moldDetectionEnabled=!1,this._moldHumidityThreshold=70,this._moldSustainedMinutes=30,this._moldNotificationCooldown=60,this._moldNotificationsEnabled=!0,this._moldNotificationTargets=[],this._moldPreventionEnabled=!1,this._moldPreventionIntensity=`medium`,this._moldPreventionNotify=!1,this._compressorGroups=[],this._sharedHeatSources=[],this._wholeHouseAverage={temperature_sensors:[],temperature_offsets:{},humidity_sensors:[],humidity_offsets:{},home_presence_entities:[],occupancy_entities:[],media_player_entities:[]},this._wholeHousePlant={enabled:!1,entity_id:``,operating_mode:`auto`,mpc_enabled:!0,cooling_target:24,cooling_start_delta:.5,cooling_stop_delta:.2,minimum_outdoor_cooling_temp:18,evaporative_max_outdoor_humidity:70,evaporative_max_indoor_humidity:70,evaporative_humidity_resume_delta:5,evaporative_min_indoor_outdoor_delta:1,minimum_cooling_run_minutes:30,minimum_ventilation_run_minutes:30,cooling_fan_min_speed:4,cooling_fan_max_speed:10,ventilation_fan_speed:4,max_continuous_runtime_minutes:240,feedback_timeout_seconds:120,stale_after_seconds:180,require_home_presence:!0,require_occupancy:!0,require_exhaust_ready:!1,temperature_sensors:[],temperature_offsets:{},indoor_humidity_sensor:``,home_presence_entities:[],occupancy_entities:[],media_player_entities:[],ventilation_request_entities:[],exhaust_ready_entities:[],outdoor_air_lockout_entities:[],outdoor_air_quality_entity:``,outdoor_air_quality_max_aqi:100},this._coilDryEnabled=!1,this._coilDryMinutes=20,this._coilDryMode=`fan_only`,this._coilDryFanMode=`low`,this._coilDryMinCoolingMinutes=10,this._coilDryDrainMinutes=0,this._boostAppliedAt={},this._loaded=!1}connectedCallback(){super.connectedCallback(),this._loadSettings()}disconnectedCallback(){super.disconnectedCallback(),this._saveDebounce&&clearTimeout(this._saveDebounce)}async _loadSettings(){try{let e=(await this.hass.callWS({type:`roommind_eklabs/settings/get`})).settings;this._groupByFloor=e.group_by_floor??!1,this._climateControlActive=e.climate_control_active??!0,this._learningDisabledRooms=e.learning_disabled_rooms??[],this._outdoorTempSensor=e.outdoor_temp_sensor??``,this._outdoorHumiditySensor=e.outdoor_humidity_sensor??``,this._outdoorCoolingMin=e.outdoor_cooling_min??16,this._outdoorHeatingMax=e.outdoor_heating_max??22,this._controlMode=e.control_mode??`mpc`,this._comfortWeight=e.comfort_weight??70,this._weatherEntity=e.weather_entity??``,this._outdoorUnavailableNotify=e.outdoor_unavailable_notify??!0,this._predictionEnabled=e.prediction_enabled??!0;let t=e.vacation_until;this._vacationActive=!!(t&&t>Date.now()/1e3),this._vacationTemp=e.vacation_temp??15,this._vacationUntil=t&&t>Date.now()/1e3&&t<3250368e4?this._tsToDatetimeLocal(t):``,this._presenceEnabled=e.presence_enabled??!1,this._presencePersons=e.presence_persons??[],this._presenceAwayAction=e.presence_away_action??`eco`,this._presenceClearsOverride=e.presence_clears_override??!1,this._scheduleOffAction=e.schedule_off_action??`eco`,this._valveProtectionEnabled=e.valve_protection_enabled??!1,this._valveProtectionInterval=e.valve_protection_interval_days??7,this._moldDetectionEnabled=e.mold_detection_enabled??!1,this._moldHumidityThreshold=e.mold_humidity_threshold??70,this._moldSustainedMinutes=e.mold_sustained_minutes??30,this._moldNotificationCooldown=e.mold_notification_cooldown??60,this._moldNotificationsEnabled=e.mold_notifications_enabled??!0,this._moldNotificationTargets=e.mold_notification_targets??[],this._moldPreventionEnabled=e.mold_prevention_enabled??!1,this._moldPreventionIntensity=e.mold_prevention_intensity??`medium`,this._moldPreventionNotify=e.mold_prevention_notify_enabled??!1,this._compressorGroups=e.compressor_groups??[],this._sharedHeatSources=e.shared_heat_sources??[],this._wholeHousePlant={...this._wholeHousePlant,...e.whole_house_plant??{}};let n=this._sharedHeatSources[0],r=e.whole_house_average;this._wholeHouseAverage=r?{...r,humidity_sensors:r.humidity_sensors??(r.humidity_sensor?[r.humidity_sensor]:[]),humidity_offsets:r.humidity_offsets??{}}:{temperature_sensors:this._wholeHousePlant.temperature_sensors.length?this._wholeHousePlant.temperature_sensors:n?.temperature_sensors??[],temperature_offsets:Object.keys(this._wholeHousePlant.temperature_offsets).length?this._wholeHousePlant.temperature_offsets:n?.temperature_offsets??{},humidity_sensors:this._wholeHousePlant.indoor_humidity_sensor?[this._wholeHousePlant.indoor_humidity_sensor]:[],humidity_offsets:{},home_presence_entities:this._wholeHousePlant.home_presence_entities.length?this._wholeHousePlant.home_presence_entities:n?.home_presence_entities??[],occupancy_entities:this._wholeHousePlant.occupancy_entities.length?this._wholeHousePlant.occupancy_entities:n?.occupancy_entities??[],media_player_entities:this._wholeHousePlant.media_player_entities.length?this._wholeHousePlant.media_player_entities:n?.media_player_entities??[]},this._coilDryEnabled=e.coil_dry_enabled??!1,this._coilDryMinutes=e.coil_dry_minutes??20,this._coilDryMode=e.coil_dry_mode??`fan_only`,this._coilDryFanMode=e.coil_dry_fan_mode??`low`,this._coilDryMinCoolingMinutes=e.coil_dry_min_cooling_minutes??10,this._coilDryDrainMinutes=e.coil_dry_drain_minutes??0,this._boostAppliedAt=e.boost_applied_at??{}}catch(e){console.debug(`[RoomMind] loadSettings:`,e)}finally{this._loaded=!0}}render(){if(!this._loaded)return h`<div class="loading">${C(`panel.loading`,this.hass.language)}</div>`;let e=this.hass.language;return h`
+    `]}};j([b({attribute:!1})],An.prototype,`hass`,void 0),j([b({attribute:!1})],An.prototype,`rooms`,void 0),j([x()],An.prototype,`_resetSelectedRoom`,void 0),An=j([y(`rme-settings-reset`)],An),v(),S(),M();var Y=class extends _{constructor(...e){super(...e),this.rooms={},this._groupByFloor=!1,this._climateControlActive=!0,this._learningDisabledRooms=[],this._outdoorTempSensor=``,this._outdoorHumiditySensor=``,this._outdoorCoolingMin=16,this._outdoorHeatingMax=22,this._controlMode=`mpc`,this._comfortWeight=70,this._weatherEntity=``,this._outdoorUnavailableNotify=!0,this._predictionEnabled=!0,this._vacationActive=!1,this._vacationTemp=15,this._vacationUntil=``,this._presenceEnabled=!1,this._presencePersons=[],this._presenceAwayAction=`eco`,this._presenceClearsOverride=!1,this._scheduleOffAction=`eco`,this._valveProtectionEnabled=!1,this._valveProtectionInterval=7,this._moldDetectionEnabled=!1,this._moldHumidityThreshold=70,this._moldSustainedMinutes=30,this._moldNotificationCooldown=60,this._moldNotificationsEnabled=!0,this._moldNotificationTargets=[],this._moldPreventionEnabled=!1,this._moldPreventionIntensity=`medium`,this._moldPreventionNotify=!1,this._compressorGroups=[],this._sharedHeatSources=[],this._wholeHouseAverage={temperature_sensors:[],temperature_offsets:{},humidity_sensors:[],humidity_offsets:{},home_presence_entities:[],occupancy_entities:[],media_player_entities:[]},this._wholeHousePlant={enabled:!1,entity_id:``,operating_mode:`auto`,mpc_enabled:!0,cooling_target:24,cooling_start_delta:.5,cooling_stop_delta:.2,minimum_outdoor_cooling_temp:18,evaporative_max_outdoor_humidity:70,evaporative_max_indoor_humidity:70,evaporative_humidity_resume_delta:5,evaporative_min_indoor_outdoor_delta:1,minimum_cooling_run_minutes:30,minimum_ventilation_run_minutes:30,cooling_fan_min_speed:4,cooling_fan_max_speed:10,ventilation_fan_speed:4,max_continuous_runtime_minutes:240,feedback_timeout_seconds:120,stale_after_seconds:180,require_home_presence:!0,require_occupancy:!0,require_exhaust_ready:!1,temperature_sensors:[],temperature_offsets:{},indoor_humidity_sensor:``,home_presence_entities:[],occupancy_entities:[],media_player_entities:[],ventilation_request_entities:[],exhaust_ready_entities:[],outdoor_air_lockout_entities:[],outdoor_air_quality_entity:``,outdoor_air_quality_max_aqi:100},this._coilDryEnabled=!1,this._coilDryMinutes=20,this._coilDryMode=`fan_only`,this._coilDryFanMode=`low`,this._coilDryMinCoolingMinutes=10,this._coilDryDrainMinutes=0,this._boostAppliedAt={},this._loaded=!1,this._pendingChanges={},this._saving=!1}connectedCallback(){super.connectedCallback(),this._loadSettings()}disconnectedCallback(){super.disconnectedCallback(),this._saveDebounce&&clearTimeout(this._saveDebounce)}async _loadSettings(){try{let e=(await this.hass.callWS({type:`roommind_eklabs/settings/get`})).settings;this._groupByFloor=e.group_by_floor??!1,this._climateControlActive=e.climate_control_active??!0,this._learningDisabledRooms=e.learning_disabled_rooms??[],this._outdoorTempSensor=e.outdoor_temp_sensor??``,this._outdoorHumiditySensor=e.outdoor_humidity_sensor??``,this._outdoorCoolingMin=e.outdoor_cooling_min??16,this._outdoorHeatingMax=e.outdoor_heating_max??22,this._controlMode=e.control_mode??`mpc`,this._comfortWeight=e.comfort_weight??70,this._weatherEntity=e.weather_entity??``,this._outdoorUnavailableNotify=e.outdoor_unavailable_notify??!0,this._predictionEnabled=e.prediction_enabled??!0;let t=e.vacation_until;this._vacationActive=!!(t&&t>Date.now()/1e3),this._vacationTemp=e.vacation_temp??15,this._vacationUntil=t&&t>Date.now()/1e3&&t<3250368e4?this._tsToDatetimeLocal(t):``,this._presenceEnabled=e.presence_enabled??!1,this._presencePersons=e.presence_persons??[],this._presenceAwayAction=e.presence_away_action??`eco`,this._presenceClearsOverride=e.presence_clears_override??!1,this._scheduleOffAction=e.schedule_off_action??`eco`,this._valveProtectionEnabled=e.valve_protection_enabled??!1,this._valveProtectionInterval=e.valve_protection_interval_days??7,this._moldDetectionEnabled=e.mold_detection_enabled??!1,this._moldHumidityThreshold=e.mold_humidity_threshold??70,this._moldSustainedMinutes=e.mold_sustained_minutes??30,this._moldNotificationCooldown=e.mold_notification_cooldown??60,this._moldNotificationsEnabled=e.mold_notifications_enabled??!0,this._moldNotificationTargets=e.mold_notification_targets??[],this._moldPreventionEnabled=e.mold_prevention_enabled??!1,this._moldPreventionIntensity=e.mold_prevention_intensity??`medium`,this._moldPreventionNotify=e.mold_prevention_notify_enabled??!1,this._compressorGroups=e.compressor_groups??[],this._sharedHeatSources=e.shared_heat_sources??[],this._wholeHousePlant={...this._wholeHousePlant,...e.whole_house_plant??{}};let n=this._sharedHeatSources[0],r=e.whole_house_average;this._wholeHouseAverage=r?{...r,humidity_sensors:r.humidity_sensors??(r.humidity_sensor?[r.humidity_sensor]:[]),humidity_offsets:r.humidity_offsets??{}}:{temperature_sensors:this._wholeHousePlant.temperature_sensors.length?this._wholeHousePlant.temperature_sensors:n?.temperature_sensors??[],temperature_offsets:Object.keys(this._wholeHousePlant.temperature_offsets).length?this._wholeHousePlant.temperature_offsets:n?.temperature_offsets??{},humidity_sensors:this._wholeHousePlant.indoor_humidity_sensor?[this._wholeHousePlant.indoor_humidity_sensor]:[],humidity_offsets:{},home_presence_entities:this._wholeHousePlant.home_presence_entities.length?this._wholeHousePlant.home_presence_entities:n?.home_presence_entities??[],occupancy_entities:this._wholeHousePlant.occupancy_entities.length?this._wholeHousePlant.occupancy_entities:n?.occupancy_entities??[],media_player_entities:this._wholeHousePlant.media_player_entities.length?this._wholeHousePlant.media_player_entities:n?.media_player_entities??[]},this._coilDryEnabled=e.coil_dry_enabled??!1,this._coilDryMinutes=e.coil_dry_minutes??20,this._coilDryMode=e.coil_dry_mode??`fan_only`,this._coilDryFanMode=e.coil_dry_fan_mode??`low`,this._coilDryMinCoolingMinutes=e.coil_dry_min_cooling_minutes??10,this._coilDryDrainMinutes=e.coil_dry_drain_minutes??0,this._boostAppliedAt=e.boost_applied_at??{}}catch(e){console.debug(`[RoomMind] loadSettings:`,e)}finally{this._loaded=!0}}render(){if(!this._loaded)return h`<div class="loading">${C(`panel.loading`,this.hass.language)}</div>`;let e=this.hass.language;return h`
       <rme-settings-panel
         icon="mdi:power"
         .heading=${C(`settings.general_title`,e)}
@@ -7616,7 +7612,7 @@
       >
         <rme-settings-reset .hass=${this.hass} .rooms=${this.rooms}></rme-settings-reset>
       </rme-settings-panel>
-    `}_onBoostApplied(e){let{area_id:t,n_observations:n}=e.detail;this._boostAppliedAt={...this._boostAppliedAt,[t]:n}}_onSettingChanged(e){let{key:t,value:n}=e.detail;this[`_${t}`]=n,this._autoSave()}_availableAcFanModes(){let e=new Set;for(let t of Object.values(this.rooms??{}))for(let n of t.devices??[]){if(n.type!==`ac`)continue;let t=this.hass?.states?.[n.entity_id];for(let n of t?.attributes?.fan_modes??[])e.add(n)}return[...e].sort()}_tsToDatetimeLocal(e){let t=new Date(e*1e3),n=e=>String(e).padStart(2,`0`);return`${t.getFullYear()}-${n(t.getMonth()+1)}-${n(t.getDate())}T${n(t.getHours())}:${n(t.getMinutes())}`}_autoSave(){this._saveDebounce&&clearTimeout(this._saveDebounce),this._saveDebounce=setTimeout(()=>this._doSave(),500)}async _doSave(){z(this,`saving`);try{await this.hass.callWS({type:`roommind_eklabs/settings/save`,group_by_floor:this._groupByFloor,climate_control_active:this._climateControlActive,learning_disabled_rooms:this._learningDisabledRooms,outdoor_temp_sensor:this._outdoorTempSensor,outdoor_humidity_sensor:this._outdoorHumiditySensor,outdoor_cooling_min:this._outdoorCoolingMin,outdoor_heating_max:this._outdoorHeatingMax,control_mode:this._controlMode,comfort_weight:this._comfortWeight,weather_entity:this._weatherEntity,outdoor_unavailable_notify:this._outdoorUnavailableNotify,prediction_enabled:this._predictionEnabled,vacation_temp:this._vacationTemp,vacation_until:this._vacationActive?this._vacationUntil?new Date(this._vacationUntil).getTime()/1e3:dn:null,presence_enabled:this._presenceEnabled,presence_persons:this._presencePersons.filter(e=>e),presence_away_action:this._presenceAwayAction,presence_clears_override:this._presenceClearsOverride,schedule_off_action:this._scheduleOffAction,valve_protection_enabled:this._valveProtectionEnabled,valve_protection_interval_days:this._valveProtectionInterval,compressor_groups:this._compressorGroups.filter(e=>e.members.length>0),shared_heat_sources:this._sharedHeatSources.filter(e=>e.entity_id&&e.rooms.length>0),whole_house_plant:this._wholeHousePlant,whole_house_average:this._wholeHouseAverage,coil_dry_enabled:this._coilDryEnabled,coil_dry_minutes:this._coilDryMinutes,coil_dry_mode:this._coilDryMode,coil_dry_fan_mode:this._coilDryFanMode,coil_dry_min_cooling_minutes:this._coilDryMinCoolingMinutes,coil_dry_drain_minutes:this._coilDryDrainMinutes,mold_detection_enabled:this._moldDetectionEnabled,mold_humidity_threshold:this._moldHumidityThreshold,mold_sustained_minutes:this._moldSustainedMinutes,mold_notification_cooldown:this._moldNotificationCooldown,mold_notifications_enabled:this._moldNotificationsEnabled,mold_notification_targets:this._moldNotificationTargets.filter(e=>e.entity_id),mold_prevention_enabled:this._moldPreventionEnabled,mold_prevention_intensity:this._moldPreventionIntensity,mold_prevention_notify_enabled:this._moldPreventionNotify,mold_prevention_notify_targets:this._moldPreventionNotify?this._moldNotificationTargets.filter(e=>e.entity_id):[]}),z(this,`saved`)}catch{z(this,`error`)}}static{this.styles=l`
+    `}_onBoostApplied(e){let{area_id:t,n_observations:n}=e.detail;this._boostAppliedAt={...this._boostAppliedAt,[t]:n}}_onSettingChanged(e){let{key:t,value:n}=e.detail;this[`_${t}`]=n,Object.assign(this._pendingChanges,this._saveChange(t,n)),this._autoSave()}_saveChange(e,t){let n={groupByFloor:`group_by_floor`,climateControlActive:`climate_control_active`,learningDisabledRooms:`learning_disabled_rooms`,outdoorTempSensor:`outdoor_temp_sensor`,outdoorHumiditySensor:`outdoor_humidity_sensor`,outdoorCoolingMin:`outdoor_cooling_min`,outdoorHeatingMax:`outdoor_heating_max`,controlMode:`control_mode`,comfortWeight:`comfort_weight`,weatherEntity:`weather_entity`,outdoorUnavailableNotify:`outdoor_unavailable_notify`,predictionEnabled:`prediction_enabled`,vacationTemp:`vacation_temp`,presenceEnabled:`presence_enabled`,presencePersons:`presence_persons`,presenceAwayAction:`presence_away_action`,presenceClearsOverride:`presence_clears_override`,scheduleOffAction:`schedule_off_action`,valveProtectionEnabled:`valve_protection_enabled`,valveProtectionInterval:`valve_protection_interval_days`,compressorGroups:`compressor_groups`,sharedHeatSources:`shared_heat_sources`,wholeHousePlant:`whole_house_plant`,wholeHouseAverage:`whole_house_average`,coilDryEnabled:`coil_dry_enabled`,coilDryMinutes:`coil_dry_minutes`,coilDryMode:`coil_dry_mode`,coilDryFanMode:`coil_dry_fan_mode`,coilDryMinCoolingMinutes:`coil_dry_min_cooling_minutes`,coilDryDrainMinutes:`coil_dry_drain_minutes`,moldDetectionEnabled:`mold_detection_enabled`,moldHumidityThreshold:`mold_humidity_threshold`,moldSustainedMinutes:`mold_sustained_minutes`,moldNotificationCooldown:`mold_notification_cooldown`,moldNotificationsEnabled:`mold_notifications_enabled`,moldNotificationTargets:`mold_notification_targets`,moldPreventionEnabled:`mold_prevention_enabled`,moldPreventionIntensity:`mold_prevention_intensity`,moldPreventionNotify:`mold_prevention_notify_enabled`};if(e===`vacationActive`||e===`vacationUntil`)return{vacation_until:this._vacationActive?this._vacationUntil?new Date(this._vacationUntil).getTime()/1e3:dn:null};let r=n[e];return r?(e===`presencePersons`&&(t=t.filter(Boolean)),e===`compressorGroups`&&(t=t.filter(e=>e.members.length>0)),e===`sharedHeatSources`&&(t=t.filter(e=>e.entity_id&&e.rooms.length>0)),e===`moldNotificationTargets`?(t=t.filter(e=>e.entity_id),{mold_notification_targets:t,...this._moldPreventionNotify?{mold_prevention_notify_targets:t}:{}}):e===`moldPreventionNotify`?{mold_prevention_notify_enabled:t,mold_prevention_notify_targets:t?this._moldNotificationTargets.filter(e=>e.entity_id):[]}:{[r]:t}):(console.error(`[RoomMind] Unknown settings field: ${e}`),{})}_availableAcFanModes(){let e=new Set;for(let t of Object.values(this.rooms??{}))for(let n of t.devices??[]){if(n.type!==`ac`)continue;let t=this.hass?.states?.[n.entity_id];for(let n of t?.attributes?.fan_modes??[])e.add(n)}return[...e].sort()}_tsToDatetimeLocal(e){let t=new Date(e*1e3),n=e=>String(e).padStart(2,`0`);return`${t.getFullYear()}-${n(t.getMonth()+1)}-${n(t.getDate())}T${n(t.getHours())}:${n(t.getMinutes())}`}_autoSave(){this._saveDebounce&&clearTimeout(this._saveDebounce),this._saveDebounce=setTimeout(()=>this._doSave(),500)}async _doSave(){if(this._saving||Object.keys(this._pendingChanges).length===0)return;let e=this._pendingChanges;this._pendingChanges={},this._saving=!0,z(this,`saving`);try{await this.hass.callWS({type:`roommind_eklabs/settings/save`,...e}),z(this,`saved`)}catch(t){console.error(`[RoomMind] Failed to save settings`,t,e),z(this,`error`)}finally{this._saving=!1,Object.keys(this._pendingChanges).length>0&&this._autoSave()}}static{this.styles=l`
     :host {
       display: flex;
       flex-direction: column;

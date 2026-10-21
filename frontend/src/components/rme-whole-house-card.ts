@@ -1,6 +1,11 @@
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import type { HomeAssistant, SharedHeatSource, WholeHouseOverride, WholeHousePlant } from "../types";
+import type {
+  HomeAssistant,
+  SharedHeatSource,
+  WholeHouseOverride,
+  WholeHousePlant,
+} from "../types";
 import { inputStyles } from "../styles/input-styles";
 
 @customElement("rme-whole-house-card")
@@ -24,9 +29,7 @@ export class RmeWholeHouseCard extends LitElement {
         padding: 18px;
         border-radius: 8px;
       }
-      .top,
-      .temperatures,
-      .mode {
+      .top {
         display: flex;
         align-items: center;
       }
@@ -70,6 +73,8 @@ export class RmeWholeHouseCard extends LitElement {
       }
       .plant-section {
         min-width: 0;
+        display: flex;
+        flex-direction: column;
       }
       .plant-section + .plant-section {
         border-left: 1px solid var(--divider-color);
@@ -121,44 +126,28 @@ export class RmeWholeHouseCard extends LitElement {
         white-space: nowrap;
       }
       .mode {
-        gap: 8px;
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(0, 1fr);
+        gap: 0;
+        width: 100%;
       }
       .mode button {
         border: 1px solid var(--divider-color);
         background: transparent;
         color: var(--primary-text-color);
         min-height: 40px;
-        padding: 0 16px;
+        padding: 0 12px;
+        margin-left: -1px;
         cursor: pointer;
         font: inherit;
       }
       .mode button:first-child {
         border-radius: 6px 0 0 6px;
+        margin-left: 0;
       }
       .mode button:last-child {
         border-radius: 0 6px 6px 0;
-        margin-left: -9px;
-      }
-      .cooling-controls {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 12px;
-        align-items: center;
-      }
-      .cooling-controls .mode {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 0;
-      }
-      .cooling-controls .mode button {
-        padding: 0 10px;
-        margin-left: -1px;
-      }
-      .cooling-controls .mode button:first-child {
-        margin-left: 0;
-      }
-      .cooling-controls .mode button:last-child {
-        margin-left: -1px;
       }
       .mode button[active] {
         background: var(--primary-color);
@@ -167,16 +156,21 @@ export class RmeWholeHouseCard extends LitElement {
       }
       .mode button.heating-power {
         display: inline-flex;
+        justify-content: center;
         align-items: center;
         gap: 7px;
-        border-radius: 6px;
-        margin-left: 0;
       }
       .mode .heating-power ha-icon {
         --mdc-icon-size: 18px;
       }
       .temperatures {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 12px;
+        margin-top: 12px;
+      }
+      .temperatures.single {
+        grid-template-columns: minmax(0, 1fr);
       }
       ha-textfield {
         width: 100%;
@@ -195,7 +189,10 @@ export class RmeWholeHouseCard extends LitElement {
           padding-top: 18px;
         }
         .temperatures {
-          align-items: stretch;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .temperatures.single {
+          grid-template-columns: minmax(0, 1fr);
         }
         .override-section {
           grid-column: auto;
@@ -338,37 +335,37 @@ export class RmeWholeHouseCard extends LitElement {
                 }
               </div>
             </div>
-            <div class="cooling-controls">
-              <div class="mode">
-                <button
-                  ?active=${plantMode === "auto"}
-                  ?disabled=${!plant?.entity_id}
-                  @click=${() => this._plantMode("auto")}
-                >
-                  Auto
-                </button>
-                <button
-                  ?active=${plantMode === "cool"}
-                  ?disabled=${!plant?.entity_id}
-                  @click=${() => this._plantMode("cool")}
-                >
-                  Cool
-                </button>
-                <button
-                  ?active=${plantMode === "fan_only"}
-                  ?disabled=${!plant?.entity_id}
-                  @click=${() => this._plantMode("fan_only")}
-                >
-                  Fresh
-                </button>
-                <button
-                  ?active=${plantMode === "off"}
-                  ?disabled=${!plant?.entity_id}
-                  @click=${() => this._plantMode("off")}
-                >
-                  Off
-                </button>
-              </div>
+            <div class="mode">
+              <button
+                ?active=${plantMode === "auto"}
+                ?disabled=${!plant?.entity_id}
+                @click=${() => this._plantMode("auto")}
+              >
+                Auto
+              </button>
+              <button
+                ?active=${plantMode === "cool"}
+                ?disabled=${!plant?.entity_id}
+                @click=${() => this._plantMode("cool")}
+              >
+                Cool
+              </button>
+              <button
+                ?active=${plantMode === "fan_only"}
+                ?disabled=${!plant?.entity_id}
+                @click=${() => this._plantMode("fan_only")}
+              >
+                Fresh
+              </button>
+              <button
+                ?active=${plantMode === "off"}
+                ?disabled=${!plant?.entity_id}
+                @click=${() => this._plantMode("off")}
+              >
+                Off
+              </button>
+            </div>
+            <div class="temperatures single">
               <ha-textfield
                 type="number"
                 min="16"
@@ -388,9 +385,11 @@ export class RmeWholeHouseCard extends LitElement {
                 <ha-icon icon="mdi:timer-cog-outline"></ha-icon> Temporary override
               </div>
               <div class="plant-status">
-                ${overrideActive
-                  ? `${this.override.mode === "heat" ? "Heating" : "Cooling"} to ${this.override.temperature}°C · ${overrideMinutes} min left`
-                  : "Schedule resumes automatically"}
+                ${
+                  overrideActive
+                    ? `${this.override.mode === "heat" ? "Heating" : "Cooling"} to ${this.override.temperature}°C · ${overrideMinutes} min left`
+                    : "Schedule resumes automatically"
+                }
               </div>
             </div>
             <div class="override-controls">
@@ -398,11 +397,15 @@ export class RmeWholeHouseCard extends LitElement {
                 <button
                   ?active=${this._overrideMode === "heat"}
                   @click=${() => this._selectOverrideMode("heat")}
-                >Heat</button>
+                >
+                  Heat
+                </button>
                 <button
                   ?active=${this._overrideMode === "cool"}
                   @click=${() => this._selectOverrideMode("cool")}
-                >Cool</button>
+                >
+                  Cool
+                </button>
               </div>
               <ha-textfield
                 type="number"
@@ -482,9 +485,10 @@ export class RmeWholeHouseCard extends LitElement {
 
   private _selectOverrideMode(mode: "heat" | "cool") {
     this._overrideMode = mode;
-    this._overrideTarget = mode === "heat"
-      ? (this.source.comfort_temperature ?? this.source.target_temperature ?? 18)
-      : (this.plant?.cooling_target ?? 24);
+    this._overrideTarget =
+      mode === "heat"
+        ? (this.source.comfort_temperature ?? this.source.target_temperature ?? 18)
+        : (this.plant?.cooling_target ?? 24);
   }
 
   private _applyOverride() {
