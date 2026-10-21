@@ -81,6 +81,13 @@ async def test_plant_commands_evaporative_cooling(hass, mock_config_entry):
         [
             call(
                 "climate",
+                "set_hvac_mode",
+                {"entity_id": "climate.magiqtouch_zone_1", "hvac_mode": "cool"},
+                blocking=True,
+                context=ANY,
+            ),
+            call(
+                "climate",
                 "set_fan_mode",
                 {"entity_id": "climate.magiqtouch_zone_1", "fan_mode": "8"},
                 blocking=True,
@@ -127,7 +134,45 @@ async def test_plant_retries_until_entity_reports_requested_mode(hass, mock_conf
         item for item in hass.services.async_call.await_args_list
         if item.args[:2] == ("climate", "set_hvac_mode") and item.args[2].get("hvac_mode") == "cool"
     ]
-    assert len(cool_calls) == 2
+    # Initial mode command, post-fan confirmation, then the next-cycle retry.
+    assert len(cool_calls) == 3
+
+
+@pytest.mark.asyncio
+async def test_plant_mode_command_is_not_blocked_by_fan_command_failure(
+    hass, mock_config_entry
+):
+    coordinator = _create_coordinator(hass, mock_config_entry)
+    coordinator.outdoor_temp_effective = 22.0
+    coordinator.outdoor_humidity = 40.0
+    hass.config.units.temperature_unit = UnitOfTemperature.CELSIUS
+    states = {
+        "climate.magiqtouch_zone_1": State("climate.magiqtouch_zone_1", "off"),
+        "sensor.living_temperature": State(
+            "sensor.living_temperature", "28", {"unit_of_measurement": "°C"}
+        ),
+        "person.isaac": State("person.isaac", "home"),
+        "binary_sensor.downstairs_presence": State(
+            "binary_sensor.downstairs_presence", "on"
+        ),
+    }
+    hass.states.get.side_effect = states.get
+
+    async def service_call(domain, service, data, **kwargs):
+        if service == "set_fan_mode":
+            raise TimeoutError("slow controller")
+
+    hass.services.async_call = AsyncMock(side_effect=service_call)
+
+    await coordinator._async_control_whole_house_plant(
+        {}, _settings(fresh_air_max_outdoor_temperature=20.0)
+    )
+
+    assert hass.services.async_call.await_args_list[0].args[:3] == (
+        "climate",
+        "set_hvac_mode",
+        {"entity_id": "climate.magiqtouch_zone_1", "hvac_mode": "cool"},
+    )
 
 
 @pytest.mark.asyncio

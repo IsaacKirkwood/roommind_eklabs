@@ -789,6 +789,23 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         command_needed = plan.transition or (
             feedback_available and reported_mode != plan.mode
         )
+        mode_command_sent = False
+        if command_needed:
+            try:
+                await self.hass.services.async_call(
+                    "climate",
+                    "set_hvac_mode",
+                    {"entity_id": entity_id, "hvac_mode": plan.mode},
+                    blocking=True,
+                    context=make_roommind_context(),
+                )
+                mode_command_sent = True
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("Whole-house plant command failed for '%s'", entity_id)
+        if mode_command_sent and plan.mode != PLANT_MODE_OFF and plan.fan_speed_changed:
+            # Start the plant before adjusting its fan. A slow fan-speed write
+            # must never prevent the primary mode command from reaching it.
+            await asyncio.sleep(PLANT_COMMAND_SETTLE_SECONDS)
         fan_command_sent = False
         if plan.fan_speed_changed and plan.fan_speed is not None:
             try:
@@ -803,11 +820,9 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             except Exception:  # noqa: BLE001
                 _LOGGER.exception("Whole-house plant fan command failed for '%s'", entity_id)
         if fan_command_sent and plan.mode != PLANT_MODE_OFF:
-            # The ESP32 bridge can acknowledge a fan write before it is ready
-            # for the following mode write. Give the slower Wi-Fi/Modbus path a
-            # moment to settle rather than issuing two competing commands.
+            # Fan writes can transiently change the MagIQtouch operating mode.
+            # Reassert the requested mode once the bridge has settled.
             await asyncio.sleep(PLANT_COMMAND_SETTLE_SECONDS)
-        if command_needed or (fan_command_sent and plan.mode != PLANT_MODE_OFF):
             try:
                 await self.hass.services.async_call(
                     "climate",
@@ -817,7 +832,9 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                     context=make_roommind_context(),
                 )
             except Exception:  # noqa: BLE001
-                _LOGGER.exception("Whole-house plant command failed for '%s'", entity_id)
+                _LOGGER.exception(
+                    "Whole-house plant mode confirmation failed for '%s'", entity_id
+                )
 
     async def _async_control_shared_heat_sources(
         self, room_states: dict[str, dict], settings: dict | None = None
