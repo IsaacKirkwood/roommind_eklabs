@@ -84,6 +84,12 @@ After installation, RoomMind appears as a panel in the HA sidebar.
 
 RoomMind starts controlling immediately. If MPC is enabled (default), the thermal model begins learning in the background.
 
+### Whole-house humidity sensors
+
+In **RoomMind > Settings > House averages**, add one or more humidity sensors for the whole-house evaporative cooler. You can set a correction for each sensor; RoomMind averages the valid corrected readings. Add or remove sensors there, then reload the page to confirm the selection was saved. To replace a sensor, remove the old one and add the new one. The same section holds the whole-house temperature sensors used for heating and cooling decisions.
+
+The settings page saves each changed field without resubmitting an older copy of the whole-house configuration. Older installations with a single humidity sensor are migrated to the multi-sensor setting. Since **v0.8.17**, averaging humidity sensors also preserves the configured cooler's `climate.*` entity ID when RoomMind sends mode and fan commands.
+
 ## Analytics
 
 ![Analytics](docs/images/page-analytics.png)
@@ -137,6 +143,8 @@ These can be used in HA automations, dashboards, or other integrations.
 **MPC shows "learning" for a long time** - The model needs ~60 idle and ~20 heating/cooling observations. This can take a few days for rooms that heat rarely. Check progress in the Analytics tab.
 
 **Room not heating/cooling when expected** - Check outdoor gating thresholds in Settings > Control. Default: no cooling below 16 C, no heating above 22 C.
+
+**Whole-house cooler stays Off with humidity sensors configured** - Update the EKLabs fork to v0.8.17 or later in HACS and restart Home Assistant. Then check the whole-house status on the Rooms page for occupancy, humidity, outdoor-air, feedback, and heating interlocks. A satisfied cooling target also keeps the cooler off.
 
 **Thermal model seems wrong after room changes** - If you've changed insulation, radiators, or moved sensors, reset the model in Settings > Reset Thermal Data.
 
