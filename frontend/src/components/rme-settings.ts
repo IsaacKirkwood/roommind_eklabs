@@ -103,7 +103,7 @@ export class RsSettings extends LitElement {
     cooling_fan_max_speed: 10,
     ventilation_fan_speed: 4,
     max_continuous_runtime_minutes: 240,
-    feedback_timeout_seconds: 120,
+    feedback_timeout_seconds: 300,
     stale_after_seconds: 180,
     require_home_presence: true,
     require_occupancy: true,
@@ -578,7 +578,8 @@ export class RsSettings extends LitElement {
   }
 
   private _cleanWholeHousePlant(value: WholeHousePlant): WholeHousePlant {
-    const { live: _live, ...stored } = value;
+    const { live, ...stored } = value;
+    void live;
     return {
       ...stored,
       ventilation_request_entities: [...new Set(stored.ventilation_request_entities ?? [])],
@@ -588,7 +589,10 @@ export class RsSettings extends LitElement {
   }
 
   private _cleanSharedHeatSources(value: SharedHeatSource[]): SharedHeatSource[] {
-    return value.map(({ live: _live, ...source }) => source);
+    return value.map(({ live, ...source }) => {
+      void live;
+      return source;
+    });
   }
 
   /**

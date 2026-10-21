@@ -830,7 +830,7 @@ async def websocket_get_settings(
             vol.Optional("max_continuous_runtime_minutes", default=240): vol.All(
                 vol.Coerce(int), vol.Range(min=15, max=720)
             ),
-            vol.Optional("feedback_timeout_seconds", default=120): vol.All(vol.Coerce(int), vol.Range(min=30, max=600)),
+            vol.Optional("feedback_timeout_seconds", default=300): vol.All(vol.Coerce(int), vol.Range(min=30, max=1800)),
             vol.Optional("stale_after_seconds", default=180): vol.All(vol.Coerce(int), vol.Range(min=60, max=1800)),
             vol.Optional("require_home_presence", default=True): bool,
             vol.Optional("require_occupancy", default=True): bool,

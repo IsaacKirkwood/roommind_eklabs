@@ -9,6 +9,14 @@ from homeassistant.core import State
 from .conftest import _create_coordinator
 
 
+@pytest.fixture(autouse=True)
+def _skip_plant_command_settle(monkeypatch):
+    monkeypatch.setattr(
+        "custom_components.roommind_eklabs.coordinator.PLANT_COMMAND_SETTLE_SECONDS",
+        0,
+    )
+
+
 def _settings(**overrides) -> dict:
     plant = {
         "enabled": True,
@@ -73,13 +81,6 @@ async def test_plant_commands_evaporative_cooling(hass, mock_config_entry):
         [
             call(
                 "climate",
-                "set_hvac_mode",
-                {"entity_id": "climate.magiqtouch_zone_1", "hvac_mode": "cool"},
-                blocking=True,
-                context=ANY,
-            ),
-            call(
-                "climate",
                 "set_fan_mode",
                 {"entity_id": "climate.magiqtouch_zone_1", "fan_mode": "8"},
                 blocking=True,
@@ -95,8 +96,11 @@ async def test_plant_commands_evaporative_cooling(hass, mock_config_entry):
         ]
     )
     assert coordinator._whole_house_plant_live["current_temperature"] == 27.0
-    assert coordinator._whole_house_plant_live["mode"] == "cool"
-    assert coordinator._whole_house_plant_live["fan_speed"] == 8
+    assert coordinator._whole_house_plant_live["mode"] == "off"
+    assert coordinator._whole_house_plant_live["requested_mode"] == "cool"
+    assert coordinator._whole_house_plant_live["command_pending"] is True
+    assert coordinator._whole_house_plant_live["fan_speed"] is None
+    assert coordinator._whole_house_plant_live["requested_fan_speed"] == 8
 
 
 @pytest.mark.asyncio
@@ -115,14 +119,51 @@ async def test_plant_retries_until_entity_reports_requested_mode(hass, mock_conf
     hass.states.get.side_effect = states.get
     hass.services.async_call = AsyncMock()
 
-    await coordinator._async_control_whole_house_plant({}, _settings())
-    await coordinator._async_control_whole_house_plant({}, _settings())
+    settings = _settings(fresh_air_max_outdoor_temperature=20.0)
+    await coordinator._async_control_whole_house_plant({}, settings)
+    await coordinator._async_control_whole_house_plant({}, settings)
 
     cool_calls = [
         item for item in hass.services.async_call.await_args_list
         if item.args[:2] == ("climate", "set_hvac_mode") and item.args[2].get("hvac_mode") == "cool"
     ]
     assert len(cool_calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_plant_reports_controller_mode_while_cooling_command_is_pending(
+    hass, mock_config_entry
+):
+    coordinator = _create_coordinator(hass, mock_config_entry)
+    coordinator.outdoor_temp_effective = 22.0
+    coordinator.outdoor_humidity = 40.0
+    hass.config.units.temperature_unit = UnitOfTemperature.CELSIUS
+    states = {
+        "climate.magiqtouch_zone_1": State(
+            "climate.magiqtouch_zone_1", "fan_only", {"fan_mode": "5"}
+        ),
+        "sensor.living_temperature": State(
+            "sensor.living_temperature", "28", {"unit_of_measurement": "°C"}
+        ),
+        "person.isaac": State("person.isaac", "home"),
+        "binary_sensor.downstairs_presence": State(
+            "binary_sensor.downstairs_presence", "on"
+        ),
+    }
+    hass.states.get.side_effect = states.get
+    hass.services.async_call = AsyncMock()
+
+    await coordinator._async_control_whole_house_plant(
+        {}, _settings(fresh_air_max_outdoor_temperature=20.0)
+    )
+
+    live = coordinator._whole_house_plant_live
+    assert live["mode"] == "fan_only"
+    assert live["requested_mode"] == "cool"
+    assert live["command_pending"] is True
+    assert live["fan_speed"] == 5
+    assert live["requested_fan_speed"] == 8
+    assert "waiting for controller (fan only)" in live["reason"]
 
 
 def test_whole_house_override_expires(hass, mock_config_entry, monkeypatch):

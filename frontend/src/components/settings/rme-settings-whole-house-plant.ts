@@ -164,7 +164,7 @@ export class RmeSettingsWholeHousePlant extends LitElement {
         "RoomMind checks that the climate entity follows each command and stops safely if it does not.",
         html`
           <div class="grid">
-            ${this._number("Command response timeout", "feedback_timeout_seconds", "sec", 30, 600, 10, "Time allowed for the controller to report the requested mode before a fault.")}
+            ${this._number("Command response timeout", "feedback_timeout_seconds", "sec", 30, 1800, 10, "Time allowed for a slow controller to report the requested mode before a fault. Five minutes is recommended for weak Wi-Fi.")}
             ${this._number("Legacy stale threshold", "stale_after_seconds", "sec", 60, 1800, 30, "Retained for compatibility; availability and command feedback provide live safety checks.")}
           </div>
         `,
@@ -240,10 +240,10 @@ export class RmeSettingsWholeHousePlant extends LitElement {
                       label="Remove"
                       .path=${"M19,13H5V11H19V13Z"}
                       @click=${() =>
-            this._set(
-              key,
-              entities.filter((entity) => entity !== id),
-            )}
+                        this._set(
+                          key,
+                          entities.filter((entity) => entity !== id),
+                        )}
                     ></ha-icon-button>
                   </div>`,
               )}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from datetime import timedelta
@@ -100,6 +101,8 @@ from .utils.sensor_utils import read_sensor_value
 from .utils.temp_utils import celsius_delta_to_ha, ha_temp_to_celsius, ha_temp_unit_str
 
 _LOGGER = logging.getLogger(__name__)
+
+PLANT_COMMAND_SETTLE_SECONDS = 3
 
 
 def _get_area_name(hass: HomeAssistant, area_id: str) -> str:
@@ -630,7 +633,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             cooling_fan_max_speed=int(raw.get("cooling_fan_max_speed", 10)),
             ventilation_fan_speed=int(raw.get("ventilation_fan_speed", 4)),
             max_continuous_runtime_minutes=int(raw.get("max_continuous_runtime_minutes", 240)),
-            feedback_timeout_seconds=int(raw.get("feedback_timeout_seconds", 120)),
+            feedback_timeout_seconds=int(raw.get("feedback_timeout_seconds", 300)),
             stale_after_seconds=int(raw.get("stale_after_seconds", 180)),
             require_home_presence=bool(raw.get("require_home_presence", True)),
             require_occupancy=bool(raw.get("require_occupancy", True)),
@@ -720,11 +723,33 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                 self._whole_house_mpc_advice and self._whole_house_mpc_advice.cooling_ready
             ),
         )
+        reported_mode = plant_state.state if plant_state is not None else None
+        actual_mode = (
+            reported_mode
+            if reported_mode in {PLANT_MODE_OFF, "cool", "fan_only"}
+            else PLANT_MODE_OFF
+        )
+        command_pending = feedback_available and actual_mode != plan.mode
+        reported_fan_speed: int | None = None
+        if plant_state is not None and actual_mode != PLANT_MODE_OFF:
+            try:
+                reported_fan_speed = int(plant_state.attributes.get("fan_mode"))
+            except (TypeError, ValueError):
+                pass
+        live_reason = plan.reason
+        if command_pending and not plan.fault:
+            live_reason = (
+                f"{plan.reason}; waiting for controller "
+                f"({actual_mode.replace('_', ' ')})"
+            )
+
         self._whole_house_plant_live = {
             "configured": True,
             "entity_id": entity_id,
-            "mode": plan.mode,
-            "reason": plan.reason,
+            "mode": actual_mode,
+            "requested_mode": plan.mode,
+            "command_pending": command_pending,
+            "reason": live_reason,
             "fault": plan.fault,
             "cooling_allowed": plan.cooling_allowed,
             "ventilation_allowed": plan.ventilation_allowed,
@@ -734,7 +759,8 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             "outdoor_aqi": outdoor_aqi,
             "outdoor_air_safe": outdoor_air_safe,
             "target_temperature": config.cooling_target,
-            "fan_speed": plan.fan_speed,
+            "fan_speed": reported_fan_speed,
+            "requested_fan_speed": plan.fan_speed,
             "home_occupied": home_occupied,
             "occupied": occupied,
             "predicted_temperature": (
@@ -758,13 +784,30 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             },
         }
         for room_state in room_states.values():
-            room_state["shared_cooling_active"] = plan.mode == "cool"
-            room_state["shared_ventilation_active"] = plan.mode == "fan_only"
-        reported_mode = plant_state.state if plant_state is not None else None
+            room_state["shared_cooling_active"] = actual_mode == "cool"
+            room_state["shared_ventilation_active"] = actual_mode == "fan_only"
         command_needed = plan.transition or (
             feedback_available and reported_mode != plan.mode
         )
-        if command_needed:
+        fan_command_sent = False
+        if plan.fan_speed_changed and plan.fan_speed is not None:
+            try:
+                await self.hass.services.async_call(
+                    "climate",
+                    "set_fan_mode",
+                    {"entity_id": entity_id, "fan_mode": str(plan.fan_speed)},
+                    blocking=True,
+                    context=make_roommind_context(),
+                )
+                fan_command_sent = True
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("Whole-house plant fan command failed for '%s'", entity_id)
+        if fan_command_sent and plan.mode != PLANT_MODE_OFF:
+            # The ESP32 bridge can acknowledge a fan write before it is ready
+            # for the following mode write. Give the slower Wi-Fi/Modbus path a
+            # moment to settle rather than issuing two competing commands.
+            await asyncio.sleep(PLANT_COMMAND_SETTLE_SECONDS)
+        if command_needed or (fan_command_sent and plan.mode != PLANT_MODE_OFF):
             try:
                 await self.hass.services.async_call(
                     "climate",
@@ -775,28 +818,6 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                 )
             except Exception:  # noqa: BLE001
                 _LOGGER.exception("Whole-house plant command failed for '%s'", entity_id)
-        if plan.fan_speed_changed and plan.fan_speed is not None:
-            try:
-                await self.hass.services.async_call(
-                    "climate",
-                    "set_fan_mode",
-                    {"entity_id": entity_id, "fan_mode": str(plan.fan_speed)},
-                    blocking=True,
-                    context=make_roommind_context(),
-                )
-                # MagIQtouch applies mode and fan speed as separate Modbus
-                # commands. A speed write can leave the controller reporting
-                # Off, so make the requested active mode the final command.
-                if plan.mode != PLANT_MODE_OFF:
-                    await self.hass.services.async_call(
-                        "climate",
-                        "set_hvac_mode",
-                        {"entity_id": entity_id, "hvac_mode": plan.mode},
-                        blocking=True,
-                        context=make_roommind_context(),
-                    )
-            except Exception:  # noqa: BLE001
-                _LOGGER.exception("Whole-house plant fan command failed for '%s'", entity_id)
 
     async def _async_control_shared_heat_sources(
         self, room_states: dict[str, dict], settings: dict | None = None

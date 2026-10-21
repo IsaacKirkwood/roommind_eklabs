@@ -218,13 +218,23 @@ export class RmeWholeHouseCard extends LitElement {
     const plantMode = plantEnabled ? (plant?.operating_mode ?? "auto") : "off";
     const houseTemperature =
       typeof plantLive?.current_temperature === "number" ? plantLive.current_temperature : current;
+    const requestedPlantLabel =
+      plantLive?.requested_mode === "cool"
+        ? "evaporative cooling"
+        : plantLive?.requested_mode === "fan_only"
+          ? "fresh air"
+          : plantLive?.requested_mode === "off"
+            ? "shutdown"
+            : "controller";
     const overallStatus = live?.active
       ? "Gas heating"
-      : plantLive?.mode === "cool"
-        ? "Evaporative cooling"
-        : plantLive?.mode === "fan_only"
-          ? "Fresh air"
-          : "Ready";
+      : plantLive?.command_pending
+        ? `Starting ${requestedPlantLabel}`
+        : plantLive?.mode === "cool"
+          ? "Evaporative cooling"
+          : plantLive?.mode === "fan_only"
+            ? "Fresh air"
+            : "Ready";
     const mpcActive = Boolean(
       live?.mpc_active || plantLive?.mpc_heating_active || plantLive?.mpc_cooling_active,
     );

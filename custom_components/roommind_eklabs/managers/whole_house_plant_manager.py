@@ -55,7 +55,7 @@ class WholeHousePlantConfig:
     ventilation_fan_speed: int = 4
     refrigerated_dew_point_margin: float = 2.0
     max_continuous_runtime_minutes: int = 240
-    feedback_timeout_seconds: int = 120
+    feedback_timeout_seconds: int = 300
     stale_after_seconds: int = 180
     require_home_presence: bool = True
     require_occupancy: bool = True

@@ -193,6 +193,8 @@ export interface WholeHousePlant {
   outdoor_air_quality_max_aqi: number;
   live?: {
     mode?: "off" | "cool" | "fan_only";
+    requested_mode?: "off" | "cool" | "fan_only";
+    command_pending?: boolean;
     reason?: string;
     fault?: string | null;
     current_temperature?: number | null;
@@ -203,6 +205,7 @@ export interface WholeHousePlant {
     ventilation_allowed?: boolean;
     fresh_air_suitable?: boolean;
     fan_speed?: number | null;
+    requested_fan_speed?: number | null;
     predicted_temperature?: number | null;
     mpc_heating_active?: boolean;
     mpc_cooling_active?: boolean;
