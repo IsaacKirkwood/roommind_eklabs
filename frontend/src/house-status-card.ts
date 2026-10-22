@@ -7,6 +7,7 @@ interface CardConfig {
   type: string;
   title?: string;
   control_source_entity?: string;
+  compact?: boolean;
 }
 
 interface HouseResponse {
@@ -66,7 +67,7 @@ export class RoomMindHouseStatusCard extends LitElement {
   }
 
   getCardSize(): number {
-    return 4;
+    return this._config.compact ? 2 : 4;
   }
 
   getGridOptions(): { columns: number; rows: string } {
@@ -131,6 +132,35 @@ export class RoomMindHouseStatusCard extends LitElement {
     const status = plant ? this._modeLabel(plant) : "Waiting for RoomMind";
     const accent = live?.fault || sourceWarning ? "warning" : live?.mode === "cool" ? "cool" : live?.mode === "fan_only" ? "fan" : "idle";
     const unit = "°C"; // RoomMind's whole-house model and cooling settings use Celsius.
+
+    if (this._config.compact) {
+      return html`
+        <ha-card>
+          <div class="card compact ${accent}">
+            <div class="compact-header">
+              <h2>${this._config.title || "House cooling"}</h2>
+              <span class="status"><span class="status-dot"></span>${status}</span>
+            </div>
+            <div class="compact-main">
+              <div class="compact-temperature">
+                <div><span class="number">${temperature(current)}</span><span class="unit">${unit}</span></div>
+                <span class="caption">Inside now</span>
+              </div>
+              <div class="compact-readings">
+                <div class="compact-prediction">
+                  <span>In 30 min without cooling</span>
+                  <strong>${typeof predicted === "number" ? temperatureWithUnit(predicted) : "Learning…"}</strong>
+                </div>
+                <div class="compact-fan">Fan ${typeof live?.fan_speed === "number" ? `${live.fan_speed} / 10` : live?.mode === "off" ? "off" : "–"}</div>
+              </div>
+            </div>
+            ${this._error ? html`<p class="notice" role="status">${this._error}</p>` : nothing}
+            ${sourceWarning ? html`<p class="notice" role="status">${sourceWarning}</p>` : nothing}
+            ${live?.fault ? html`<p class="notice" role="status">${explanation(live.fault)}</p>` : nothing}
+          </div>
+        </ha-card>
+      `;
+    }
 
     return html`
       <ha-card>
@@ -219,7 +249,23 @@ export class RoomMindHouseStatusCard extends LitElement {
     .outlook-value { margin-top: 3px; font-size: 14px; }
     .outlook-note { margin-top: 5px; color: var(--secondary-text-color); font-size: 11px; line-height: 1.35; }
     .footer { margin-top: 18px; color: var(--secondary-text-color); font-size: 10px; text-align: right; }
-    @media (max-width: 420px) { .card { padding: 18px; } .header { flex-wrap: wrap; } .status { max-width: 100%; } .temperatures { grid-template-columns: 1fr; gap: 18px; } .number { font-size: 56px; } }
+    .compact { padding: 16px 18px; }
+    .compact-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
+    .compact-header h2 { margin: 0; font-size: 16px; }
+    .compact .status { max-width: 100%; padding: 5px 8px; font-size: 11px; }
+    .compact-main { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 13px; }
+    .compact-temperature { min-width: 0; }
+    .compact-temperature > div { display: flex; align-items: flex-start; white-space: nowrap; }
+    .compact .number { font-size: 43px; }
+    .compact .unit { font-size: 15px; margin-top: 3px; }
+    .compact .caption { display: block; margin-top: 2px; font-size: 11px; }
+    .compact-readings { display: grid; justify-items: end; gap: 7px; min-width: 0; text-align: right; }
+    .compact-prediction { display: grid; gap: 2px; }
+    .compact-prediction span { color: var(--secondary-text-color); font-size: 10px; line-height: 1.2; }
+    .compact-prediction strong { font-size: 16px; line-height: 1.15; }
+    .compact-fan { color: var(--secondary-text-color); font-size: 11px; }
+    .compact .notice { margin-top: 12px; font-size: 11px; }
+    @media (max-width: 420px) { .card { padding: 18px; } .header { flex-wrap: wrap; } .status { max-width: 100%; } .temperatures { grid-template-columns: 1fr; gap: 18px; } .number { font-size: 56px; } .card.compact { padding: 16px; } .compact .number { font-size: 40px; } }
   `;
 }
 

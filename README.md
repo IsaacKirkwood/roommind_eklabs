@@ -119,7 +119,7 @@ RoomMind includes a read-only dashboard card designed to explain whole-house coo
 After updating RoomMind and restarting Home Assistant, add a **JavaScript module** resource in **Settings → Dashboards → Resources**:
 
 ```text
-/roommind_eklabs/roommind-house-status-card.js?v=0.8.23
+/roommind_eklabs/roommind-house-status-card.js?v=0.8.24
 ```
 
 Then add a **Manual** card to any dashboard:
@@ -138,6 +138,15 @@ control_source_entity: select.magiqtouch_esp32_controller_control_source
 ```
 
 The card refreshes RoomMind's whole-house state every minute. It has no controls, so household members can check it without changing any cooling settings.
+
+For a compact tablet card, add `compact: true`. It shows only the current indoor temperature, cooling status, fan speed, and 30-minute estimate without cooling. The detailed temperature rows, forecast high, explanation, and prediction footnote stay in the full card.
+
+```yaml
+type: custom:roommind-house-status-card
+title: House cooling
+compact: true
+control_source_entity: select.magiqtouch_esp32_controller_control_source
+```
 
 ## Analytics
 
