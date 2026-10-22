@@ -43,6 +43,8 @@ class WholeHousePlantConfig:
     cooling_stop_delta: float = 0.2
     fresh_air_max_outdoor_temperature: float = 22.0
     fresh_air_max_outdoor_humidity: float = 70.0
+    fresh_air_requires_cooler_outdoor: bool = True
+    fresh_air_min_indoor_temperature: float | None = None
     minimum_outdoor_cooling_temp: float = 18.0
     evaporative_max_outdoor_humidity: float = 70.0
     evaporative_max_indoor_humidity: float = 70.0
@@ -180,11 +182,16 @@ class WholeHousePlantManager:
                 cooling_demand = indoor_temperature > self.config.cooling_target + self.config.cooling_stop_delta
             else:
                 cooling_demand = start_temperature >= self.config.cooling_target + self.config.cooling_start_delta
-            if cooling_demand:
-                if fresh_air_suitable:
-                    desired = MODE_VENTILATE
-                    reason = "fresh air preferred for cooling"
-                elif cooling_allowed:
+            fresh_air_demand = (
+                cooling_demand
+                if self.config.fresh_air_min_indoor_temperature is None
+                else indoor_temperature > self.config.fresh_air_min_indoor_temperature
+            )
+            if fresh_air_suitable and (fresh_air_demand or cooling_demand):
+                desired = MODE_VENTILATE
+                reason = "fresh air preferred for cooling"
+            elif cooling_demand:
+                if cooling_allowed:
                     desired = MODE_COOL
                     reason = "evaporative cooling demand"
                 elif ventilation_requested and ventilation_allowed:
@@ -250,8 +257,8 @@ class WholeHousePlantManager:
         ):
             return False
         return (
-            outdoor_temperature < indoor_temperature
-            and outdoor_temperature <= self.config.fresh_air_max_outdoor_temperature
+            (not self.config.fresh_air_requires_cooler_outdoor or outdoor_temperature < indoor_temperature)
+            and outdoor_temperature < self.config.fresh_air_max_outdoor_temperature
             and outdoor_humidity <= self.config.fresh_air_max_outdoor_humidity
         )
 

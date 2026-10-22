@@ -803,6 +803,10 @@ async def websocket_get_settings(
             vol.Optional("fresh_air_max_outdoor_humidity", default=70.0): vol.All(
                 vol.Coerce(float), vol.Range(min=10, max=100)
             ),
+            vol.Optional("fresh_air_requires_cooler_outdoor", default=True): bool,
+            vol.Optional("fresh_air_min_indoor_temperature"): vol.All(
+                vol.Coerce(float), vol.Range(min=16, max=35)
+            ),
             vol.Optional("minimum_outdoor_cooling_temp", default=18.0): vol.All(
                 vol.Coerce(float), vol.Range(min=0, max=40)
             ),

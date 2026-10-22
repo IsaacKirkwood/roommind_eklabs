@@ -622,6 +622,12 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             fresh_air_max_outdoor_humidity=float(
                 raw.get("fresh_air_max_outdoor_humidity", 70.0)
             ),
+            fresh_air_requires_cooler_outdoor=bool(raw.get("fresh_air_requires_cooler_outdoor", True)),
+            fresh_air_min_indoor_temperature=(
+                float(raw["fresh_air_min_indoor_temperature"])
+                if raw.get("fresh_air_min_indoor_temperature") is not None
+                else None
+            ),
             minimum_outdoor_cooling_temp=float(raw.get("minimum_outdoor_cooling_temp", 18.0)),
             evaporative_max_outdoor_humidity=float(raw.get("evaporative_max_outdoor_humidity", 70.0)),
             evaporative_max_indoor_humidity=float(raw.get("evaporative_max_indoor_humidity", 70.0)),

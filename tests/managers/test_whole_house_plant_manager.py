@@ -71,6 +71,34 @@ def test_fresh_air_requires_outside_to_be_cooler_than_inside():
     assert plan.mode == MODE_COOL
 
 
+def test_configured_fresh_air_threshold_allows_warmer_outdoor_air():
+    manager = WholeHousePlantManager(
+        WholeHousePlantConfig(
+            "climate.magiqtouch_zone_1",
+            cooling_target=23.0,
+            cooling_start_delta=0.5,
+            fresh_air_max_outdoor_temperature=28.0,
+            fresh_air_requires_cooler_outdoor=False,
+            fresh_air_min_indoor_temperature=23.0,
+            minimum_outdoor_cooling_temp=28.0,
+        )
+    )
+    plan = _evaluate(manager, indoor_temperature=26.1, outdoor_temperature=27.1)
+    assert plan.mode == MODE_VENTILATE
+    assert plan.reason == "fresh air preferred for cooling"
+
+    manager.state.commanded_mode = MODE_OFF
+    plan = _evaluate(manager, indoor_temperature=23.1, outdoor_temperature=27.1)
+    assert plan.mode == MODE_VENTILATE
+
+    manager.state.commanded_mode = MODE_OFF
+    plan = _evaluate(manager, indoor_temperature=23.0, outdoor_temperature=27.1)
+    assert plan.mode == MODE_OFF
+
+    plan = _evaluate(manager, indoor_temperature=26.1, outdoor_temperature=28.0)
+    assert plan.mode == MODE_COOL
+
+
 def test_hot_dry_air_uses_wet_bulb_advantage():
     manager = WholeHousePlantManager(WholeHousePlantConfig("climate.magiqtouch_zone_1"))
     plan = _evaluate(

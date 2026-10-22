@@ -92,6 +92,7 @@ export class RsSettings extends LitElement {
     cooling_stop_delta: 0.2,
     fresh_air_max_outdoor_temperature: 22,
     fresh_air_max_outdoor_humidity: 70,
+    fresh_air_requires_cooler_outdoor: true,
     minimum_outdoor_cooling_temp: 18,
     evaporative_max_outdoor_humidity: 70,
     evaporative_max_indoor_humidity: 70,

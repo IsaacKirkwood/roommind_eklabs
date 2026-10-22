@@ -146,6 +146,8 @@ These can be used in HA automations, dashboards, or other integrations.
 
 **Whole-house cooler stays Off with humidity sensors configured** - Update the EKLabs fork to v0.8.17 or later in HACS and restart Home Assistant. Then check the whole-house status on the Rooms page for occupancy, humidity, outdoor-air, feedback, and heating interlocks. A satisfied cooling target also keeps the cooler off.
 
+**Fresh-air fan stays Off below the outdoor limit** - In Auto mode, RoomMind normally requires outdoor air to be cooler than indoors. From v0.8.18, disable **Require cooler outside air** and set **Fresh-air indoor start temperature** to choose a separate indoor threshold. The outdoor temperature and humidity limits, home-presence gate, feedback checks, and heating interlock still apply. A temporary whole-house Cool override forces evaporative cooling and bypasses Auto's fresh-air choice; cancel that override to use automatic fan selection. Bringing in warmer outdoor air can raise the indoor temperature.
+
 **Thermal model seems wrong after room changes** - If you've changed insulation, radiators, or moved sensors, reset the model in Settings > Reset Thermal Data.
 
 **Frontend not updating after update** - Hard-refresh: **Cmd+Shift+R** (Mac) or **Ctrl+Shift+R** (Windows/Linux).

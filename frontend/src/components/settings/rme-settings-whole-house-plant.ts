@@ -107,13 +107,31 @@ export class RmeSettingsWholeHousePlant extends LitElement {
       )}
       ${this._section(
         "Automatic cooling",
-        "Auto mode tries fresh outside air first. It switches to evaporative cooling when outside air is too warm or humid, provided evaporative conditions remain safe.",
+        "Auto mode tries fresh outside air first. It switches to evaporative cooling when fresh air is unsuitable, provided evaporative conditions remain safe.",
         html`
           <div class="grid">
             ${this._number("Cooling target", "cooling_target", "°C", 16, 35, 0.5, "The whole-house temperature Auto mode aims to maintain.")}
             ${this._number("Start above target", "cooling_start_delta", "°C", 0.1, 5, 0.1, "Starts when measured or predicted temperature reaches target plus this amount.")}
             ${this._number("Stop above target", "cooling_stop_delta", "°C", 0, 5, 0.1, "May stop once measured temperature falls to target plus this amount.")}
-            ${this._number("Fresh-air maximum outdoor temperature", "fresh_air_max_outdoor_temperature", "°C", 0, 40, 0.5, "Use fan-only cooling when outside is no warmer than this and is cooler than the house.")}
+            ${this._number("Fresh-air maximum outdoor temperature", "fresh_air_max_outdoor_temperature", "°C", 0, 40, 0.5, "Use fan-only cooling when outside is below this limit.")}
+            ${this._toggle("Require cooler outside air", "When enabled, fan-only cooling also requires the outdoor air to be cooler than the house.", "fresh_air_requires_cooler_outdoor", p.fresh_air_requires_cooler_outdoor ?? true)}
+            <div class="field">
+              <ha-textfield
+                type="number"
+                label="Fresh-air indoor start temperature"
+                suffix="°C"
+                min="16"
+                max="35"
+                step="0.1"
+                .value=${String(p.fresh_air_min_indoor_temperature ?? p.cooling_target + p.cooling_start_delta)}
+                @change=${(e: Event) => this._set("fresh_air_min_indoor_temperature", Number((e.target as HTMLInputElement).value))}
+              ></ha-textfield>
+              <span class="hint"
+                >In Auto mode, start fan-only cooling when the measured indoor temperature is above
+                this value. Existing settings use the normal cooling start threshold until this
+                field is changed.</span
+              >
+            </div>
             ${this._number("Fresh-air maximum outdoor humidity", "fresh_air_max_outdoor_humidity", "%", 10, 100, 1, "Use fan-only cooling only when outdoor humidity is at or below this value.")}
           </div>
         `,

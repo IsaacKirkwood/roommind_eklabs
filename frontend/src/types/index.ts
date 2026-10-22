@@ -164,6 +164,8 @@ export interface WholeHousePlant {
   cooling_stop_delta: number;
   fresh_air_max_outdoor_temperature: number;
   fresh_air_max_outdoor_humidity: number;
+  fresh_air_requires_cooler_outdoor: boolean;
+  fresh_air_min_indoor_temperature?: number;
   minimum_outdoor_cooling_temp: number;
   evaporative_max_outdoor_humidity: number;
   evaporative_max_indoor_humidity: number;
