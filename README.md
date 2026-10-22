@@ -90,6 +90,26 @@ In **RoomMind > Settings > House averages**, add one or more humidity sensors fo
 
 The settings page saves each changed field without resubmitting an older copy of the whole-house configuration. Older installations with a single humidity sensor are migrated to the multi-sensor setting. Since **v0.8.17**, averaging humidity sensors also preserves the configured cooler's `climate.*` entity ID when RoomMind sends mode and fan commands.
 
+### Whole-house fan and evaporative cooling example
+
+In **RoomMind > Settings > Whole-house cooler**, select **Auto** to let RoomMind choose between fan-only and evaporative modes. The following is the configuration used for the EKLabs MagIQtouch installation as of v0.8.20; it is an example, not a default applied to every installation.
+
+| Setting | EKLabs value | Effect |
+|---|---:|---|
+| Cooling target / start / stop margin | 25°C / 0.5°C / 0.2°C | Normally starts evaporative cooling at 25.5°C and may stop after reaching 25.2°C. |
+| Fresh-air indoor start | Above 23°C | Requests fan-only below the outdoor limit, independently of the evaporative target. |
+| Fresh-air outdoor limit | Below 28°C | At exactly 28°C, the normal fan-only cooling path is excluded. |
+| Require cooler outside air | Off | Normal fan-only mode can run below 28°C even when outside is warmer than indoors. This may warm the house. |
+| Fresh-air outdoor humidity limit | 75% | Blocks automatic fresh-air cooling above this humidity. |
+| Evaporative outdoor minimum | 28°C | Normally switches to evaporative cooling at or above 28°C when cooling is needed and safeguards pass. Forecast pre-cooling is the exception below 28°C. |
+| Evaporative outdoor / indoor humidity limits | 65% / 60% | Avoids water cooling in humid conditions; indoor humidity must fall 5 percentage points below the limit before restarting. |
+| Minimum wet-bulb advantage | 2°C | Requires estimated outdoor wet-bulb temperature to be at least 2°C below indoor temperature. |
+| Forecast pre-cooling | On; 32°C peak within 6 hours | May use evaporative cooling before 28°C on a forecast hot day when outdoor air is no more than 0.5°C cooler than indoors and the house is at least 24.5°C. Current humidity and wet-bulb limits still apply. |
+| Evaporative minimum / maximum run | 20 / 90 minutes | Reduces short cycling and caps each continuous water-cooling run. |
+| Evaporative rest | 20 minutes | After the run cap, uses fan-only if outside is cooler than indoors and below the fresh-air limits; otherwise turns off until the rest ends. |
+
+Forecast pre-cooling uses the highest **remaining hourly forecast temperature for the current local day** from the configured weather entity. If the forecast is unavailable, RoomMind follows the normal temperature and humidity rules. Manual **Cool** mode or a temporary Cool override forces evaporative cooling and bypasses Auto's mode choice and timed rest. Presence, air-quality, controller feedback, and gas-heating interlocks still apply. Ducted evaporative cooling needs an open window, door, or other exhaust path; configure **Require an open exhaust path** with a suitable sensor if you have one.
+
 ## Analytics
 
 ![Analytics](docs/images/page-analytics.png)
@@ -148,7 +168,7 @@ These can be used in HA automations, dashboards, or other integrations.
 
 **Fresh-air fan stays Off below the outdoor limit** - In Auto mode, RoomMind normally requires outdoor air to be cooler than indoors. From v0.8.18, disable **Require cooler outside air** and set **Fresh-air indoor start temperature** to choose a separate indoor threshold. The outdoor temperature and humidity limits, home-presence gate, feedback checks, and heating interlock still apply. A temporary whole-house Cool override forces evaporative cooling and bypasses Auto's fresh-air choice; cancel that override to use automatic fan selection. Bringing in warmer outdoor air can raise the indoor temperature.
 
-**Forecast pre-cooling and evaporative rests (v0.8.19, refined in v0.8.20)** - Enable **Pre-cool before a forecast hot peak** under Settings > Whole-house cooler. The weather entity must provide an hourly forecast. When today's remaining forecast reaches the configured peak within the lead time, Auto may start evaporative cooling below the normal outdoor changeover if indoor temperature is at least 0.5°C below the cooling target, outdoor air is no more than 0.5°C cooler than indoors, and humidity and wet-bulb checks pass. Without a valid forecast, normal fan and evaporative behavior applies. Set **Maximum evaporative run** and **Evaporative rest** to limit continuous water cooling. During a rest, RoomMind uses fan-only only when outdoor air is cooler than indoors and meets fresh-air limits; otherwise it turns the plant off until the rest ends. Zero maximum disables timed rests. These controls apply only in Auto mode. Keep an exhaust path open while a ducted evaporative cooler runs; use the exhaust-ready sensor option if one is available.
+**Forecast pre-cooling or evaporative rest not behaving as expected** - Check the [whole-house cooling example](#whole-house-fan-and-evaporative-cooling-example) for each threshold and the Auto-only behavior. A missing hourly forecast disables pre-cooling. Setting **Maximum evaporative run** to zero disables timed rests.
 
 **Thermal model seems wrong after room changes** - If you've changed insulation, radiators, or moved sensors, reset the model in Settings > Reset Thermal Data.
 
