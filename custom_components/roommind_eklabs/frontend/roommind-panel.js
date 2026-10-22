@@ -6676,7 +6676,7 @@
       ${this._section(`Run times & fan speed`,`Minimum runs reduce rapid cycling. Cooling fan speed scales with demand; fresh air uses a fixed speed.`,h`
           <div class="grid">
             ${this._number(`Minimum evaporative run`,`minimum_cooling_run_minutes`,`min`,0,120,5,`Keep evaporative cooling running for at least this long unless a safety gate opens.`)}
-            ${this._number(`Maximum evaporative run`,`maximum_cooling_run_minutes`,`min`,0,720,10,`After this much continuous water cooling, switch to fresh air when suitable or rest off. Zero disables timed rests.`)}
+            ${this._number(`Maximum evaporative run`,`maximum_cooling_run_minutes`,`min`,0,720,10,`After this much continuous water cooling, switch to fresh air only when outside is cooler than indoors; otherwise rest off. Zero disables timed rests.`)}
             ${this._number(`Evaporative rest`,`cooling_rest_minutes`,`min`,5,120,5,`Minimum time before evaporative cooling may start again after its run limit.`)}
             ${this._number(`Minimum fresh-air run`,`minimum_ventilation_run_minutes`,`min`,0,120,5,`Keep fan-only cooling running for at least this long unless a safety gate opens.`)}
             ${this._number(`Cooling minimum fan speed`,`cooling_fan_min_speed`,`/ 10`,1,10,1,`Lowest fan level for a small evaporative cooling demand.`)}

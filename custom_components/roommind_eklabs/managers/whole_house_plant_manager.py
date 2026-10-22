@@ -174,6 +174,12 @@ class WholeHousePlantManager:
             self.state.cooling_rest_until is not None
             and timestamp < self.state.cooling_rest_until
         )
+        rest_fan_suitable = (
+            fresh_air_suitable
+            and indoor_temperature is not None
+            and outdoor_temperature is not None
+            and outdoor_temperature < indoor_temperature
+        )
         cooling_run_expired = (
             self.config.operating_mode == "auto"
             and self.config.maximum_cooling_run_minutes > 0
@@ -203,7 +209,7 @@ class WholeHousePlantManager:
         elif self.config.operating_mode == MODE_OFF:
             reason = "manually off"
         elif cooling_run_expired:
-            if fresh_air_suitable:
+            if rest_fan_suitable:
                 desired = MODE_VENTILATE
                 reason = "evaporative run limit; fresh air preferred"
             else:
@@ -238,7 +244,7 @@ class WholeHousePlantManager:
                 else indoor_temperature > self.config.fresh_air_min_indoor_temperature
             )
             if cooling_rest_active:
-                if fresh_air_suitable and (fresh_air_demand or cooling_demand):
+                if rest_fan_suitable and (fresh_air_demand or cooling_demand):
                     desired = MODE_VENTILATE
                     reason = "evaporative rest; fresh air preferred"
                 else:

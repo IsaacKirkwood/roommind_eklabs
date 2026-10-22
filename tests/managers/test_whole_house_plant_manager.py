@@ -167,8 +167,8 @@ def test_evaporative_run_limit_moves_to_fan_then_allows_restart_after_rest():
         )
     )
     conditions = dict(
-        indoor_temperature=26.0,
-        outdoor_temperature=27.0,
+        indoor_temperature=27.0,
+        outdoor_temperature=26.7,
         forecast_high_temperature=35.0,
         forecast_peak_hours_away=3.0,
     )
@@ -195,6 +195,33 @@ def test_evaporative_rest_turns_off_when_fresh_air_is_too_hot():
     assert resting.reason == "evaporative run limit; resting"
     assert _evaluate(manager, now=5000, outdoor_temperature=32.0).mode == MODE_OFF
     assert _evaluate(manager, now=5802, outdoor_temperature=32.0).mode == MODE_COOL
+
+
+def test_evaporative_rest_does_not_use_warmer_fan_air():
+    manager = WholeHousePlantManager(
+        WholeHousePlantConfig(
+            "climate.plant",
+            cooling_target=25.0,
+            fresh_air_max_outdoor_temperature=28.0,
+            fresh_air_requires_cooler_outdoor=False,
+            minimum_outdoor_cooling_temp=28.0,
+            forecast_precool_enabled=True,
+            forecast_precool_high_temperature=32.0,
+            maximum_cooling_run_minutes=30,
+            minimum_cooling_run_minutes=20,
+            cooling_rest_minutes=20,
+        )
+    )
+    conditions = dict(
+        indoor_temperature=26.0,
+        outdoor_temperature=27.0,
+        forecast_high_temperature=35.0,
+        forecast_peak_hours_away=2.0,
+    )
+    assert _evaluate(manager, now=1000, **conditions).mode == MODE_COOL
+    rested = _evaluate(manager, now=2801, reported_mode=MODE_COOL, **conditions)
+    assert rested.mode == MODE_OFF
+    assert rested.reason == "evaporative run limit; resting"
 
 
 def test_hot_dry_air_uses_wet_bulb_advantage():
