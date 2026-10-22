@@ -439,7 +439,10 @@ export class RoomMindPanel extends LitElement {
             : nothing
         }
         ${
-          !inDetail && this._activeTab === "analytics" && this._analyticsRoom
+          !inDetail &&
+          this._activeTab === "analytics" &&
+          this._analyticsRoom &&
+          this._rooms[this._analyticsRoom]
             ? html`<ha-icon-button
                 .path=${THERMOMETER_PATH}
                 @click=${this._onGoToRoomFromAnalytics}
@@ -907,9 +910,7 @@ export class RoomMindPanel extends LitElement {
     }
   }
 
-  private async _onWholeHouseOverrideChanged(
-    event: CustomEvent<{ override: WholeHouseOverride }>,
-  ) {
+  private async _onWholeHouseOverrideChanged(event: CustomEvent<{ override: WholeHouseOverride }>) {
     this._wholeHouseOverride = event.detail.override;
     try {
       await this.hass.callWS({

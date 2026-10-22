@@ -120,10 +120,12 @@ export function buildChartSeries(
   // Event band series
   const heatingBandData: Array<[number, number | null]> = [];
   const coolingBandData: Array<[number, number | null]> = [];
+  const fanBandData: Array<[number, number | null]> = [];
   const windowBandData: Array<[number, number | null]> = [];
   let hasHeating = false,
     hasCooling = false,
-    hasWindow = false;
+    hasWindow = false,
+    hasFan = false;
 
   for (const p of points) {
     const ts = p.ts * 1000;
@@ -138,6 +140,12 @@ export function buildChartSeries(
       hasCooling = true;
     } else {
       coolingBandData.push([ts, null]);
+    }
+    if (p.mode === "fan_only") {
+      fanBandData.push([ts, 999]);
+      hasFan = true;
+    } else {
+      fanBandData.push([ts, null]);
     }
     if (p.window_open) {
       windowBandData.push([ts, 999]);
@@ -174,6 +182,23 @@ export function buildChartSeries(
       showSymbol: false,
       lineStyle: { width: 0 },
       areaStyle: { color: "rgba(63, 81, 181, 0.08)", origin: "start" },
+      tooltip: { show: false },
+      yAxisIndex: 0,
+      z: -1,
+      connectNulls: false,
+    });
+  }
+
+  if (hasFan) {
+    series.push({
+      id: "fan_events",
+      type: "line",
+      name: localize("analytics.fan_period", l),
+      color: "rgb(0, 150, 136)",
+      data: fanBandData,
+      showSymbol: false,
+      lineStyle: { width: 0 },
+      areaStyle: { color: "rgba(0, 150, 136, 0.08)", origin: "start" },
       tooltip: { show: false },
       yAxisIndex: 0,
       z: -1,
@@ -319,6 +344,8 @@ export function buildChartOptions(
               if (closest.device_setpoint != null) {
                 parts.push(`AC ${formatTemp(closest.device_setpoint, hass)}\u00A0${unit}`);
               }
+            } else if (closest.mode === "fan_only") {
+              parts.push(localize("analytics.fan_period", l));
             }
             if (closest.window_open) parts.push(localize("analytics.window_open_period", l));
             if (parts.length > 0) {

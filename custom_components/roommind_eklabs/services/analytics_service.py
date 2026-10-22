@@ -23,6 +23,7 @@ from ..control.mpc_controller import (
     get_can_heat_cool,
     is_mpc_active,
 )
+from ..managers.whole_house_mpc import WHOLE_HOUSE_MODEL_ID
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -71,6 +72,89 @@ def _csv_to_points(rows: list[dict]) -> list[dict]:
             }
         )
     return result
+
+
+async def build_whole_house_analytics_data(
+    hass: HomeAssistant,
+    coordinator: Any,
+    custom_start: float | None,
+    custom_end: float | None,
+    range_key: str,
+) -> dict:
+    """Show the central plant's measured history and its idle thermal outlook.
+
+    The forecast is deliberately an idle baseline: future automatic mode changes
+    cannot be known from the current weather forecast alone.
+    """
+    history_store = getattr(coordinator, "_history_store", None)
+    detail: list[dict] = []
+    history: list[dict] = []
+    if history_store:
+        max_age = {"12h": 43200, "24h": 86400, "2d": 172800, "7d": 604800,
+                   "14d": 1209600, "30d": 2592000, "90d": 7776000}.get(range_key, 43200)
+        if custom_start is not None:
+            detail = _csv_to_points(await hass.async_add_executor_job(
+                history_store.read_detail, WHOLE_HOUSE_MODEL_ID, None, custom_start, custom_end))
+            history = _csv_to_points(await hass.async_add_executor_job(
+                history_store.read_history, WHOLE_HOUSE_MODEL_ID, None, custom_start, custom_end))
+        else:
+            detail = _csv_to_points(await hass.async_add_executor_job(
+                history_store.read_detail, WHOLE_HOUSE_MODEL_ID, max_age))
+            history = _csv_to_points(await hass.async_add_executor_job(
+                history_store.read_history, WHOLE_HOUSE_MODEL_ID, max_age))
+
+    live = getattr(coordinator, "_whole_house_plant_live", {}) or {}
+    current_temp = live.get("current_temperature")
+    if current_temp is not None and (custom_end is None or custom_end >= time.time() - 300):
+        detail.append({
+            "ts": time.time(), "room_temp": current_temp,
+            "outdoor_temp": coordinator.outdoor_temp_effective,
+            "target_temp": live.get("target_temperature"),
+            "mode": {"cool": "cooling", "heat": "heating"}.get(
+                live.get("mode"), live.get("mode", "off")
+            ), "predicted_temp": None,
+            "window_open": False, "device_setpoint": None,
+        })
+
+    model_info: dict = {}
+    mgr = getattr(coordinator, "_model_manager", None)
+    est = mgr._estimators.get(WHOLE_HOUSE_MODEL_ID) if mgr else None
+    forecast: list[dict] = []
+    if est:
+        rc = est.get_model()
+        advice = getattr(coordinator, "_whole_house_mpc_advice", None)
+        sigma_proxy = math.sqrt(max(est._P[0][0], 0.0))
+        model_info = {
+            "confidence": est.confidence, "model": rc.to_dict(),
+            "n_samples": est._n_updates, "n_observations": est._n_updates,
+            "n_heating": est._n_heating, "n_cooling": est._n_cooling,
+            "applicable_modes": sorted(est._applicable_modes),
+            "mpc_active": bool(advice and (advice.heating_ready or advice.cooling_ready)),
+            "sigma_e": round(sigma_proxy, 4),
+            "prediction_std_idle": round(est.prediction_std(0.0, 20.0, 15.0, 5.0), 4),
+            "prediction_std_heating": round(est.prediction_std(rc.Q_heat, 20.0, 10.0, 5.0), 4),
+            "has_occupancy_sensors": False,
+        }
+        if est._n_updates > 0 and current_temp is not None and coordinator.outdoor_temp_effective is not None:
+            from ..control.analytics_simulator import build_forecast_outdoor_series
+
+            outdoor = build_forecast_outdoor_series(
+                coordinator._weather_manager._outdoor_forecast,
+                coordinator.outdoor_temp_effective, 37)
+            predicted = current_temp
+            now = time.time()
+            for i in range(37):
+                if i:
+                    predicted = rc.predict(predicted, outdoor[i - 1], 0.0, 5.0)
+                forecast.append({
+                    "ts": round((now + i * 300) / 300) * 300,
+                    "room_temp": None, "outdoor_temp": None,
+                    "target_temp": live.get("target_temperature"),
+                    "mode": "forecast", "predicted_temp": round(predicted, 2),
+                    "window_open": False, "device_setpoint": None,
+                })
+    return {"detail": detail, "history": history, "model": model_info,
+            "forecast": forecast, "forecast_basis": "idle"}
 
 
 async def _compute_target_forecast(
@@ -181,6 +265,8 @@ async def build_analytics_data(
 
     This is the core data assembly extracted from websocket_get_analytics.
     """
+    if area_id == WHOLE_HOUSE_MODEL_ID:
+        return await build_whole_house_analytics_data(hass, coordinator, custom_start, custom_end, range_key)
     settings = store.get_settings()
     history_store = getattr(coordinator, "_history_store", None)
 

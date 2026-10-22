@@ -331,6 +331,41 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         self._history_write_count += 1
         if self._history_write_count >= HISTORY_WRITE_CYCLES and self._history_store:
             self._history_write_count = 0
+            plant = self._whole_house_plant_live
+            if plant.get("configured") and plant.get("current_temperature") is not None:
+                try:
+                    heating_active = any(bool(plan.get("active")) for plan in self._shared_heat_plans)
+                    plant_mode = plant.get("mode", "off")
+                    history_mode = (
+                        "heating" if heating_active and plant_mode != "cool"
+                        else {"cool": "cooling", "heat": "heating"}.get(plant_mode, plant_mode)
+                    )
+                    await self.hass.async_add_executor_job(
+                        self._history_store.record,
+                        WHOLE_HOUSE_MODEL_ID,
+                        {
+                            "room_temp": plant["current_temperature"],
+                            "outdoor_temp": self.outdoor_temp_effective,
+                            "target_temp": plant.get("target_temperature"),
+                            "mode": history_mode,
+                            "predicted_temp": self._pending_predictions.pop(WHOLE_HOUSE_MODEL_ID, None),
+                            "solar_irradiance": round(self._current_q_solar, 3),
+                            "device_setpoint": None,
+                        },
+                    )
+                    if self.outdoor_temp_effective is not None:
+                        model = self._model_manager.get_model(WHOLE_HOUSE_MODEL_ID)
+                        current = plant["current_temperature"]
+                        q = (
+                            model.Q_heat if history_mode == "heating"
+                            else -model.Q_cool if plant_mode == "cool" else 0.0
+                        )
+                        raw = model.predict(current, self.outdoor_temp_effective, q, 3.0)
+                        self._pending_predictions[WHOLE_HOUSE_MODEL_ID] = round(
+                            max(current - MAX_PREDICTION_DELTA, min(current + MAX_PREDICTION_DELTA, raw)), 2
+                        )
+                except Exception:  # noqa: BLE001
+                    _LOGGER.warning("Whole-house history record failed", exc_info=True)
             for area_id, rs in room_states.items():
                 if area_id in learning_disabled:
                     continue
@@ -411,7 +446,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         self._history_rotate_count += 1
         if self._history_rotate_count >= HISTORY_ROTATE_CYCLES and self._history_store:
             self._history_rotate_count = 0
-            for area_id in rooms:
+            for area_id in (*rooms, WHOLE_HOUSE_MODEL_ID):
                 try:
                     await self.hass.async_add_executor_job(self._history_store.rotate, area_id)
                 except Exception:  # noqa: BLE001

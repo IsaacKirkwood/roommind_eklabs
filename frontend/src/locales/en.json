@@ -560,5 +560,9 @@
   "heat_source.ac_min_outdoor": "Min. outdoor temp for AC heating",
   "heat_source.ac_min_outdoor_hint": "Disable AC heating entirely below this temperature to protect the heat pump hardware.",
   "heat_source.ac_min_outdoor_suffix": "°C",
-  "heat_source.summary_disabled": "Smart source selection is off"
+  "heat_source.summary_disabled": "Smart source selection is off",
+  "analytics.whole_house": "Whole House",
+  "analytics.house_forecast_note": "Blue forecast: predicted house temperature if heating and cooling remain off for the next 3 hours. Automatic mode changes and fan cooling are not included.",
+  "analytics.fan_period": "Fan-only period",
+  "analytics.house_chart_info_body": "The orange line is the measured whole-house temperature; green is the cooling target. Red, blue and teal shading show heating, evaporative cooling and fan-only periods. The dotted blue line over the next 3 hours projects temperature with heating and cooling off, using forecast outdoor temperature and the learned house model. Automatic mode changes, fan cooling and future solar gains are not simulated. Early predictions may be less accurate while the model learns."
 }

@@ -10,6 +10,8 @@ import { buildCsvString, downloadString, buildExportFilename } from "../../utils
 import { copyToClipboard } from "../../utils/clipboard";
 import { inputStyles } from "../../styles/input-styles";
 
+export const WHOLE_HOUSE_ANALYTICS_ID = "__whole_house_plant__";
+
 @customElement("rme-analytics-toolbar")
 export class RsAnalyticsToolbar extends LitElement {
   @property({ attribute: false }) public hass!: HomeAssistant;
@@ -60,10 +62,13 @@ export class RsAnalyticsToolbar extends LitElement {
   }
 
   private _getConfiguredRooms(): Array<{ area_id: string; name: string }> {
-    return Object.entries(this.rooms).map(([area_id, config]) => {
-      const area = this.hass?.areas?.[area_id];
-      return { area_id, name: config.display_name || area?.name || area_id };
-    });
+    return [
+      { area_id: WHOLE_HOUSE_ANALYTICS_ID, name: localize("analytics.whole_house", this.language) },
+      ...Object.entries(this.rooms).map(([area_id, config]) => {
+        const area = this.hass?.areas?.[area_id];
+        return { area_id, name: config.display_name || area?.name || area_id };
+      }),
+    ];
   }
 
   private _renderRoomSelector(rooms: Array<{ area_id: string; name: string }>, l: string) {

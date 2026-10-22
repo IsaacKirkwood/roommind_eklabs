@@ -21,6 +21,7 @@ export class RsAnalyticsChart extends LitElement {
   @property({ type: Number }) public chartAnchor = 0;
   @property({ type: String }) public language = "en";
   @property({ type: Boolean }) public isOutdoor = false;
+  @property({ type: Boolean }) public isWholeHouse = false;
 
   @state() private _hiddenSeries = new Set(["outdoor_temp", "device_target"]);
   @state() private _chartInfoExpanded = false;
@@ -87,7 +88,7 @@ export class RsAnalyticsChart extends LitElement {
         ${
           this._chartInfoExpanded
             ? html`<div class="chart-info-panel">
-                ${this._renderMarkdown(localize("analytics.chart_info_body", l))}
+                ${this._renderMarkdown(localize(this.isWholeHouse ? "analytics.house_chart_info_body" : "analytics.chart_info_body", l))}
               </div>`
             : nothing
         }

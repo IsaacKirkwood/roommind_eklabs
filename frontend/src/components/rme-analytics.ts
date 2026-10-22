@@ -7,6 +7,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant, RoomConfig, AnalyticsData } from "../types";
 import { localize } from "../utils/localize";
 import "./analytics/rme-analytics-toolbar";
+import { WHOLE_HOUSE_ANALYTICS_ID } from "./analytics/rme-analytics-toolbar";
 import "./analytics/rme-analytics-chart";
 import "./analytics/rme-analytics-model";
 
@@ -46,18 +47,15 @@ export class RsAnalytics extends LitElement {
     }
     let autoSelected = false;
     if (changedProps.has("rooms") && !this._selectedRoom) {
-      const configured = Object.keys(this.rooms);
-      if (configured.length > 0) {
-        this._selectedRoom = configured[0];
-        autoSelected = true;
-        this.dispatchEvent(
-          new CustomEvent("room-selected", {
-            detail: { areaId: configured[0] },
-            bubbles: true,
-            composed: true,
-          }),
-        );
-      }
+      this._selectedRoom = WHOLE_HOUSE_ANALYTICS_ID;
+      autoSelected = true;
+      this.dispatchEvent(
+        new CustomEvent("room-selected", {
+          detail: { areaId: WHOLE_HOUSE_ANALYTICS_ID },
+          bubbles: true,
+          composed: true,
+        }),
+      );
     }
     if (
       autoSelected ||
@@ -92,6 +90,7 @@ export class RsAnalytics extends LitElement {
           ? this._loading
             ? html`<div class="loading">${localize("panel.loading", l)}</div>`
             : html`
+                ${this._selectedRoom === WHOLE_HOUSE_ANALYTICS_ID ? html`<p class="forecast-note">${localize("analytics.house_forecast_note", l)}</p>` : nothing}
                 <rme-analytics-chart
                   .hass=${this.hass}
                   .data=${this._data}
@@ -100,6 +99,7 @@ export class RsAnalytics extends LitElement {
                   .chartAnchor=${this._chartAnchor}
                   .language=${l}
                   .isOutdoor=${this.rooms[this._selectedRoom]?.is_outdoor ?? false}
+                  .isWholeHouse=${this._selectedRoom === WHOLE_HOUSE_ANALYTICS_ID}
                 ></rme-analytics-chart>
                 ${
                   !this.rooms[this._selectedRoom]?.is_outdoor
