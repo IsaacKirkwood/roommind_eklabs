@@ -114,32 +114,22 @@ Forecast pre-cooling uses the highest **remaining hourly forecast temperature fo
 
 ### House cooling dashboard card
 
-RoomMind includes a read-only dashboard card designed to explain whole-house cooling at a glance. It shows the current and target temperatures, outdoor temperature, fan speed, humidity, current mode, the reason for that mode, the highest remaining forecast temperature today, and the model's 30-minute temperature estimate **if cooling stopped**. That estimate is not an arrival-time prediction while the cooler is running.
+RoomMind includes a read-only dashboard card for household members who want to see what the whole-house cooler is doing without changing its settings. The full layout shows the indoor temperature, cooling target, outdoor temperature, fan speed, humidity, current mode, why that mode was chosen, the highest remaining forecast temperature today, and a 30-minute model estimate.
 
-After updating RoomMind and restarting Home Assistant, add a **JavaScript module** resource in **Settings → Dashboards → Resources**:
+Install [RoomMind v0.8.24 or later](https://github.com/IsaacKirkwood/roommind_eklabs/releases/latest) and restart Home Assistant. In **Settings → Dashboards → Resources**, add the following URL as a **JavaScript module**. If you already added the card with v0.8.23, **edit the existing resource URL** to this one so your tablet loads the compact layout:
 
 ```text
 /roommind_eklabs/roommind-house-status-card.js?v=0.8.24
 ```
 
-Then add a **Manual** card to any dashboard:
+Add a **Manual** card to any dashboard for the full layout:
 
 ```yaml
 type: custom:roommind-house-status-card
 title: House cooling
 ```
 
-Optionally show when the MagIQcool wall panel has taken control by adding its control-source select entity:
-
-```yaml
-type: custom:roommind-house-status-card
-title: House cooling
-control_source_entity: select.magiqtouch_esp32_controller_control_source
-```
-
-The card refreshes RoomMind's whole-house state every minute. It has no controls, so household members can check it without changing any cooling settings.
-
-For a compact tablet card, add `compact: true`. It shows only the current indoor temperature, cooling status, fan speed, and 30-minute estimate without cooling. The detailed temperature rows, forecast high, explanation, and prediction footnote stay in the full card.
+For a small tablet card, add `compact: true`. This layout keeps only the current indoor temperature, cooling status, fan speed, and 30-minute estimate. It omits the target, outdoor temperature, target gap, forecast high, detailed reason, and prediction footnote:
 
 ```yaml
 type: custom:roommind-house-status-card
@@ -147,6 +137,10 @@ title: House cooling
 compact: true
 control_source_entity: select.magiqtouch_esp32_controller_control_source
 ```
+
+The `control_source_entity` line is optional; on this MagIQcool setup it adds a warning if the wall panel takes control. Leave it out on other systems. To switch an existing full card to compact, add `compact: true` to its YAML; remove the line to return to the full layout.
+
+The prediction is the estimated indoor temperature **if cooling stopped for 30 minutes**. It is not an estimate of when active cooling will reach the target. The card refreshes RoomMind's state every minute and has no controls. If the previous layout remains after the resource URL changes, reload the dashboard in the browser or reset the Home Assistant Companion app's frontend cache.
 
 ## Analytics
 
