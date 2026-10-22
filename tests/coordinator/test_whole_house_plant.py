@@ -1,12 +1,32 @@
 """Coordinator tests for the single-zone whole-house plant."""
 
+from datetime import timedelta
 from unittest.mock import ANY, AsyncMock, call
 
 import pytest
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import State
+from homeassistant.util import dt as dt_util
 
 from .conftest import _create_coordinator
+
+
+def test_remaining_daily_forecast_peak_ignores_tomorrow_and_past(hass, mock_config_entry):
+    coordinator = _create_coordinator(hass, mock_config_entry)
+    now = dt_util.as_local(dt_util.utcnow())
+    today_hour = now.replace(hour=23, minute=0, second=0, microsecond=0)
+    if today_hour <= now:
+        # Near midnight there is no remaining hourly slot today.
+        assert coordinator._remaining_daily_forecast_peak([]) == (None, None)
+        return
+    tomorrow = today_hour + timedelta(hours=2)
+    high, hours = coordinator._remaining_daily_forecast_peak([
+        {"datetime": today_hour.isoformat(), "temperature": 34.0},
+        {"datetime": tomorrow.isoformat(), "temperature": 40.0},
+        {"datetime": (now - timedelta(hours=1)).isoformat(), "temperature": 42.0},
+    ])
+    assert high == 34.0
+    assert hours is not None and 0 <= hours <= 24
 
 
 @pytest.fixture(autouse=True)

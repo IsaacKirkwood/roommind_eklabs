@@ -15,7 +15,7 @@ def _evaluate(manager, **overrides):
     values = {
         "indoor_temperature": 27.0,
         "indoor_humidity": 50.0,
-        "outdoor_temperature": 22.0,
+        "outdoor_temperature": 21.9,
         "outdoor_humidity": 40.0,
         "home_occupied": True,
         "area_occupied": True,
@@ -99,6 +99,104 @@ def test_configured_fresh_air_threshold_allows_warmer_outdoor_air():
     assert plan.mode == MODE_COOL
 
 
+def test_forecast_precool_uses_wet_bulb_before_fan_changeover():
+    config = WholeHousePlantConfig(
+        "climate.plant",
+        cooling_target=25.0,
+        fresh_air_max_outdoor_temperature=28.0,
+        fresh_air_requires_cooler_outdoor=False,
+        fresh_air_min_indoor_temperature=23.0,
+        minimum_outdoor_cooling_temp=28.0,
+        forecast_precool_enabled=True,
+        forecast_precool_high_temperature=32.0,
+        forecast_precool_lead_hours=6,
+        evaporative_min_indoor_outdoor_delta=2.0,
+    )
+    manager = WholeHousePlantManager(config)
+    plan = _evaluate(
+        manager,
+        indoor_temperature=26.0,
+        outdoor_temperature=27.0,
+        outdoor_humidity=40.0,
+        forecast_high_temperature=35.0,
+        forecast_peak_hours_away=3.0,
+    )
+    assert plan.mode == MODE_COOL
+    assert plan.reason == "forecast pre-cooling before hot peak"
+
+    manager = WholeHousePlantManager(config)
+    no_forecast = _evaluate(manager, indoor_temperature=26.0, outdoor_temperature=27.0)
+    assert no_forecast.mode == MODE_VENTILATE
+
+    manager = WholeHousePlantManager(config)
+    cool_air = _evaluate(
+        manager,
+        indoor_temperature=26.0,
+        outdoor_temperature=24.0,
+        forecast_high_temperature=35.0,
+        forecast_peak_hours_away=3.0,
+    )
+    assert cool_air.mode == MODE_VENTILATE
+
+    manager = WholeHousePlantManager(config)
+    humid = _evaluate(
+        manager,
+        indoor_temperature=26.0,
+        outdoor_temperature=27.0,
+        outdoor_humidity=90.0,
+        forecast_high_temperature=35.0,
+        forecast_peak_hours_away=3.0,
+    )
+    assert humid.mode == MODE_OFF
+
+
+def test_evaporative_run_limit_moves_to_fan_then_allows_restart_after_rest():
+    manager = WholeHousePlantManager(
+        WholeHousePlantConfig(
+            "climate.plant",
+            cooling_target=25.0,
+            fresh_air_max_outdoor_temperature=28.0,
+            fresh_air_requires_cooler_outdoor=False,
+            minimum_outdoor_cooling_temp=28.0,
+            forecast_precool_enabled=True,
+            forecast_precool_high_temperature=32.0,
+            maximum_cooling_run_minutes=90,
+            cooling_rest_minutes=20,
+            minimum_cooling_run_minutes=20,
+            minimum_ventilation_run_minutes=0,
+        )
+    )
+    conditions = dict(
+        indoor_temperature=26.0,
+        outdoor_temperature=27.0,
+        forecast_high_temperature=35.0,
+        forecast_peak_hours_away=3.0,
+    )
+    assert _evaluate(manager, now=1000, **conditions).mode == MODE_COOL
+    resting = _evaluate(manager, now=6401, reported_mode=MODE_COOL, **conditions)
+    assert resting.mode == MODE_VENTILATE
+    assert resting.reason == "evaporative run limit; fresh air preferred"
+    assert _evaluate(manager, now=7000, reported_mode=MODE_VENTILATE, **conditions).mode == MODE_VENTILATE
+    assert _evaluate(manager, now=7602, reported_mode=MODE_VENTILATE, **conditions).mode == MODE_COOL
+
+
+def test_evaporative_rest_turns_off_when_fresh_air_is_too_hot():
+    manager = WholeHousePlantManager(
+        WholeHousePlantConfig(
+            "climate.plant",
+            fresh_air_max_outdoor_temperature=28.0,
+            maximum_cooling_run_minutes=60,
+            cooling_rest_minutes=20,
+        )
+    )
+    assert _evaluate(manager, now=1000, outdoor_temperature=32.0).mode == MODE_COOL
+    resting = _evaluate(manager, now=4601, outdoor_temperature=32.0, reported_mode=MODE_COOL)
+    assert resting.mode == MODE_OFF
+    assert resting.reason == "evaporative run limit; resting"
+    assert _evaluate(manager, now=5000, outdoor_temperature=32.0).mode == MODE_OFF
+    assert _evaluate(manager, now=5802, outdoor_temperature=32.0).mode == MODE_COOL
+
+
 def test_hot_dry_air_uses_wet_bulb_advantage():
     manager = WholeHousePlantManager(WholeHousePlantConfig("climate.magiqtouch_zone_1"))
     plan = _evaluate(
@@ -174,7 +272,7 @@ def test_evaporative_cooling_stops_at_indoor_humidity_limit_and_waits_for_margin
 def test_refrigerated_cooling_has_dew_point_guard():
     config = WholeHousePlantConfig("climate.plant", cooling_type="refrigerated", cooling_target=18.0)
     manager = WholeHousePlantManager(config)
-    plan = _evaluate(manager, indoor_temperature=25.0, indoor_humidity=80.0)
+    plan = _evaluate(manager, indoor_temperature=25.0, indoor_humidity=80.0, outdoor_temperature=25.0)
     assert dew_point_celsius(25.0, 80.0) > 21.0
     assert plan.mode == MODE_OFF
     assert plan.reason == "dew-point protection"

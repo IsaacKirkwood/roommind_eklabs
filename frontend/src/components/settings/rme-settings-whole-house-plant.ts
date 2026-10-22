@@ -137,6 +137,17 @@ export class RmeSettingsWholeHousePlant extends LitElement {
         `,
       )}
       ${this._section(
+        "Forecast pre-cooling",
+        "Optional: on a forecast hot day, use evaporative cooling before the 28°C changeover when fan-only air is unlikely to cool the house. Current humidity and wet-bulb safeguards still apply.",
+        html`
+          <div class="grid">
+            ${this._toggle("Pre-cool before a forecast hot peak", "Uses today's remaining hourly forecast. Starts only when the peak is within the lead time and the house is near or above the cooling target.", "forecast_precool_enabled", p.forecast_precool_enabled ?? false)}
+            ${this._number("Forecast peak threshold", "forecast_precool_high_temperature", "°C", 25, 45, 0.5, "Enable pre-cooling when today's forecast high reaches this temperature.")}
+            ${this._number("Start within", "forecast_precool_lead_hours", "h", 1, 12, 1, "Only pre-cool when the forecast peak is this many hours away or sooner.")}
+          </div>
+        `,
+      )}
+      ${this._section(
         "Evaporative limits",
         "These limits prevent ineffective cooling and excess indoor moisture. House temperature and humidity come from House averages.",
         html`
@@ -155,6 +166,8 @@ export class RmeSettingsWholeHousePlant extends LitElement {
         html`
           <div class="grid">
             ${this._number("Minimum evaporative run", "minimum_cooling_run_minutes", "min", 0, 120, 5, "Keep evaporative cooling running for at least this long unless a safety gate opens.")}
+            ${this._number("Maximum evaporative run", "maximum_cooling_run_minutes", "min", 0, 720, 10, "After this much continuous water cooling, switch to fresh air when suitable or rest off. Zero disables timed rests.")}
+            ${this._number("Evaporative rest", "cooling_rest_minutes", "min", 5, 120, 5, "Minimum time before evaporative cooling may start again after its run limit.")}
             ${this._number("Minimum fresh-air run", "minimum_ventilation_run_minutes", "min", 0, 120, 5, "Keep fan-only cooling running for at least this long unless a safety gate opens.")}
             ${this._number("Cooling minimum fan speed", "cooling_fan_min_speed", "/ 10", 1, 10, 1, "Lowest fan level for a small evaporative cooling demand.")}
             ${this._number("Cooling maximum fan speed", "cooling_fan_max_speed", "/ 10", 1, 10, 1, "Highest fan level used as cooling demand grows.")}

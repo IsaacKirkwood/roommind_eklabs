@@ -15,6 +15,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.util import dt as dt_util
 
 from .const import (
     AC_COOLING_BOOST_TARGET,
@@ -574,6 +575,27 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             self._model_manager, temperature, self.outdoor_temp_effective
         )
 
+    @staticmethod
+    def _remaining_daily_forecast_peak(forecast: list[dict]) -> tuple[float | None, float | None]:
+        """Return today's highest remaining hourly temperature and hours until it."""
+        now = dt_util.as_local(dt_util.utcnow())
+        peak: tuple[float, float] | None = None
+        for entry in forecast:
+            when = dt_util.parse_datetime(str(entry.get("datetime", "")))
+            if when is None or when.tzinfo is None:
+                continue
+            local_when = dt_util.as_local(when)
+            if local_when.date() != now.date() or local_when < now:
+                continue
+            try:
+                temperature = float(entry["temperature"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            hours_away = (local_when - now).total_seconds() / 3600
+            if peak is None or temperature > peak[0]:
+                peak = (temperature, hours_away)
+        return peak if peak is not None else (None, None)
+
     async def _async_control_whole_house_plant(self, room_states: dict[str, dict], settings: dict) -> None:
         """Control a single-zone whole-house evaporative cooler/fresh-air plant."""
         raw = dict(settings.get("whole_house_plant") or {})
@@ -628,12 +650,17 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                 if raw.get("fresh_air_min_indoor_temperature") is not None
                 else None
             ),
+            forecast_precool_enabled=bool(raw.get("forecast_precool_enabled", False)),
+            forecast_precool_high_temperature=float(raw.get("forecast_precool_high_temperature", 32.0)),
+            forecast_precool_lead_hours=int(raw.get("forecast_precool_lead_hours", 6)),
             minimum_outdoor_cooling_temp=float(raw.get("minimum_outdoor_cooling_temp", 18.0)),
             evaporative_max_outdoor_humidity=float(raw.get("evaporative_max_outdoor_humidity", 70.0)),
             evaporative_max_indoor_humidity=float(raw.get("evaporative_max_indoor_humidity", 70.0)),
             evaporative_humidity_resume_delta=float(raw.get("evaporative_humidity_resume_delta", 5.0)),
             evaporative_min_indoor_outdoor_delta=float(raw.get("evaporative_min_indoor_outdoor_delta", 1.0)),
             minimum_cooling_run_minutes=int(raw.get("minimum_cooling_run_minutes", 30)),
+            maximum_cooling_run_minutes=int(raw.get("maximum_cooling_run_minutes", 0)),
+            cooling_rest_minutes=int(raw.get("cooling_rest_minutes", 20)),
             minimum_ventilation_run_minutes=int(raw.get("minimum_ventilation_run_minutes", 30)),
             cooling_fan_min_speed=int(raw.get("cooling_fan_min_speed", 4)),
             cooling_fan_max_speed=int(raw.get("cooling_fan_max_speed", 10)),
@@ -706,6 +733,9 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         feedback_available = plant_state is not None and plant_state.state not in {"unavailable", "unknown"}
         age = max(0.0, time.time() - plant_state.last_updated.timestamp()) if plant_state is not None else float("inf")
         heating_active = any(bool(plan.get("active")) for plan in self._shared_heat_plans)
+        forecast_high, forecast_peak_hours = self._remaining_daily_forecast_peak(
+            self._weather_manager.forecast
+        )
         plan = self._whole_house_plant_manager.evaluate(
             indoor_temperature=indoor_temperature,
             indoor_humidity=indoor_humidity,
@@ -728,6 +758,8 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             mpc_cooling_active=bool(
                 self._whole_house_mpc_advice and self._whole_house_mpc_advice.cooling_ready
             ),
+            forecast_high_temperature=forecast_high,
+            forecast_peak_hours_away=forecast_peak_hours,
         )
         reported_mode = plant_state.state if plant_state is not None else None
         actual_mode = (
@@ -765,6 +797,8 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             "outdoor_aqi": outdoor_aqi,
             "outdoor_air_safe": outdoor_air_safe,
             "target_temperature": config.cooling_target,
+            "forecast_high_temperature": forecast_high,
+            "forecast_peak_hours_away": forecast_peak_hours,
             "fan_speed": reported_fan_speed,
             "requested_fan_speed": plan.fan_speed,
             "home_occupied": home_occupied,

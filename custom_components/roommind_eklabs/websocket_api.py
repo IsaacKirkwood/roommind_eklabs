@@ -807,6 +807,13 @@ async def websocket_get_settings(
             vol.Optional("fresh_air_min_indoor_temperature"): vol.All(
                 vol.Coerce(float), vol.Range(min=16, max=35)
             ),
+            vol.Optional("forecast_precool_enabled", default=False): bool,
+            vol.Optional("forecast_precool_high_temperature", default=32.0): vol.All(
+                vol.Coerce(float), vol.Range(min=25, max=45)
+            ),
+            vol.Optional("forecast_precool_lead_hours", default=6): vol.All(
+                vol.Coerce(int), vol.Range(min=1, max=12)
+            ),
             vol.Optional("minimum_outdoor_cooling_temp", default=18.0): vol.All(
                 vol.Coerce(float), vol.Range(min=0, max=40)
             ),
@@ -824,6 +831,12 @@ async def websocket_get_settings(
             ),
             vol.Optional("minimum_cooling_run_minutes", default=30): vol.All(
                 vol.Coerce(int), vol.Range(min=0, max=120)
+            ),
+            vol.Optional("maximum_cooling_run_minutes", default=0): vol.All(
+                vol.Coerce(int), vol.Range(min=0, max=720)
+            ),
+            vol.Optional("cooling_rest_minutes", default=20): vol.All(
+                vol.Coerce(int), vol.Range(min=5, max=120)
             ),
             vol.Optional("minimum_ventilation_run_minutes", default=30): vol.All(
                 vol.Coerce(int), vol.Range(min=0, max=120)
@@ -1046,6 +1059,14 @@ async def websocket_save_settings(
                 msg["id"],
                 "invalid_whole_house_plant_fan_range",
                 "Cooling minimum fan speed cannot exceed maximum fan speed",
+            )
+            return
+        maximum = plant.get("maximum_cooling_run_minutes", 0)
+        if maximum and maximum < plant.get("minimum_cooling_run_minutes", 30):
+            connection.send_error(
+                msg["id"],
+                "invalid_whole_house_plant_run_range",
+                "Maximum evaporative run cannot be shorter than the minimum run",
             )
             return
 

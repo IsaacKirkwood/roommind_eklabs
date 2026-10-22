@@ -45,12 +45,17 @@ class WholeHousePlantConfig:
     fresh_air_max_outdoor_humidity: float = 70.0
     fresh_air_requires_cooler_outdoor: bool = True
     fresh_air_min_indoor_temperature: float | None = None
+    forecast_precool_enabled: bool = False
+    forecast_precool_high_temperature: float = 32.0
+    forecast_precool_lead_hours: int = 6
     minimum_outdoor_cooling_temp: float = 18.0
     evaporative_max_outdoor_humidity: float = 70.0
     evaporative_max_indoor_humidity: float = 70.0
     evaporative_humidity_resume_delta: float = 5.0
     evaporative_min_indoor_outdoor_delta: float = 1.0
     minimum_cooling_run_minutes: int = 30
+    maximum_cooling_run_minutes: int = 0
+    cooling_rest_minutes: int = 20
     minimum_ventilation_run_minutes: int = 30
     cooling_fan_min_speed: int = 4
     cooling_fan_max_speed: int = 10
@@ -72,6 +77,7 @@ class WholeHousePlantState:
     mode_since: float | None = None
     mismatch_since: float | None = None
     commanded_fan_speed: int | None = None
+    cooling_rest_until: float | None = None
 
 
 @dataclass(frozen=True)
@@ -114,6 +120,8 @@ class WholeHousePlantManager:
         feedback_age_seconds: float,
         predicted_temperature: float | None = None,
         mpc_cooling_active: bool = False,
+        forecast_high_temperature: float | None = None,
+        forecast_peak_hours_away: float | None = None,
         now: float | None = None,
     ) -> WholeHousePlantPlan:
         """Return the next safe operating mode."""
@@ -142,6 +150,40 @@ class WholeHousePlantManager:
             outdoor_humidity,
             ventilation_allowed,
         )
+        forecast_precool = (
+            self.config.operating_mode == "auto"
+            and self.config.forecast_precool_enabled
+            and forecast_high_temperature is not None
+            and forecast_high_temperature >= self.config.forecast_precool_high_temperature
+            and forecast_peak_hours_away is not None
+            and 0 <= forecast_peak_hours_away <= self.config.forecast_precool_lead_hours
+            and indoor_temperature is not None
+            and outdoor_temperature is not None
+            and indoor_temperature >= self.config.cooling_target - 0.5
+            and outdoor_temperature >= indoor_temperature - 0.5
+            and outdoor_temperature < self.config.minimum_outdoor_cooling_temp
+        )
+        precool_allowed = False
+        if forecast_precool:
+            precool_allowed, _ = self._cooling_allowed(
+                indoor_temperature, indoor_humidity, outdoor_temperature, outdoor_humidity,
+                allow_below_minimum=True,
+            )
+        effective_cooling_allowed = cooling_allowed or precool_allowed
+        cooling_rest_active = (
+            self.state.cooling_rest_until is not None
+            and timestamp < self.state.cooling_rest_until
+        )
+        cooling_run_expired = (
+            self.config.operating_mode == "auto"
+            and self.config.maximum_cooling_run_minutes > 0
+            and self.state.commanded_mode == MODE_COOL
+            and self.state.mode_since is not None
+            and timestamp - self.state.mode_since >= self.config.maximum_cooling_run_minutes * 60
+        )
+        if cooling_run_expired:
+            self.state.cooling_rest_until = timestamp + self.config.cooling_rest_minutes * 60
+            cooling_rest_active = True
 
         desired = MODE_OFF
         reason = "idle"
@@ -160,7 +202,15 @@ class WholeHousePlantManager:
             reason = fault
         elif self.config.operating_mode == MODE_OFF:
             reason = "manually off"
-        elif self._minimum_run_active(timestamp, cooling_allowed):
+        elif cooling_run_expired:
+            if fresh_air_suitable:
+                desired = MODE_VENTILATE
+                reason = "evaporative run limit; fresh air preferred"
+            else:
+                reason = "evaporative run limit; resting"
+        elif self._minimum_run_active(timestamp, effective_cooling_allowed) and not (
+            self.state.commanded_mode == MODE_COOL and cooling_rest_active
+        ):
             desired = self.state.commanded_mode
             reason = f"minimum {self._mode_name(desired)} run"
         elif self.config.operating_mode == MODE_VENTILATE:
@@ -187,7 +237,16 @@ class WholeHousePlantManager:
                 if self.config.fresh_air_min_indoor_temperature is None
                 else indoor_temperature > self.config.fresh_air_min_indoor_temperature
             )
-            if fresh_air_suitable and (fresh_air_demand or cooling_demand):
+            if cooling_rest_active:
+                if fresh_air_suitable and (fresh_air_demand or cooling_demand):
+                    desired = MODE_VENTILATE
+                    reason = "evaporative rest; fresh air preferred"
+                else:
+                    reason = "evaporative rest"
+            elif precool_allowed:
+                desired = MODE_COOL
+                reason = "forecast pre-cooling before hot peak"
+            elif fresh_air_suitable and (fresh_air_demand or cooling_demand):
                 desired = MODE_VENTILATE
                 reason = "fresh air preferred for cooling"
             elif cooling_demand:
@@ -234,7 +293,7 @@ class WholeHousePlantManager:
             transition=transition,
             reason=reason,
             fault=fault,
-            cooling_allowed=cooling_allowed,
+            cooling_allowed=effective_cooling_allowed,
             ventilation_allowed=ventilation_allowed,
             fresh_air_suitable=fresh_air_suitable,
             fan_speed=fan_speed,
@@ -298,10 +357,12 @@ class WholeHousePlantManager:
         indoor_humidity: float | None,
         outdoor_temp: float | None,
         outdoor_humidity: float | None,
+        *,
+        allow_below_minimum: bool = False,
     ) -> tuple[bool, str]:
         if indoor_temp is None or outdoor_temp is None:
             return False, "waiting for temperature data"
-        if outdoor_temp < self.config.minimum_outdoor_cooling_temp:
+        if not allow_below_minimum and outdoor_temp < self.config.minimum_outdoor_cooling_temp:
             return False, "outdoor cooling lockout"
         if self.config.cooling_type == "evaporative":
             if indoor_humidity is not None:

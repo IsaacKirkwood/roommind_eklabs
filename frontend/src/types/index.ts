@@ -166,6 +166,9 @@ export interface WholeHousePlant {
   fresh_air_max_outdoor_humidity: number;
   fresh_air_requires_cooler_outdoor: boolean;
   fresh_air_min_indoor_temperature?: number;
+  forecast_precool_enabled: boolean;
+  forecast_precool_high_temperature: number;
+  forecast_precool_lead_hours: number;
   minimum_outdoor_cooling_temp: number;
   evaporative_max_outdoor_humidity: number;
   evaporative_max_indoor_humidity: number;
@@ -177,6 +180,8 @@ export interface WholeHousePlant {
   cooling_fan_max_speed: number;
   ventilation_fan_speed: number;
   max_continuous_runtime_minutes: number;
+  maximum_cooling_run_minutes: number;
+  cooling_rest_minutes: number;
   feedback_timeout_seconds: number;
   stale_after_seconds: number;
   require_home_presence: boolean;
