@@ -24,8 +24,11 @@ class FreshAirEffect:
     """Learn additional outdoor-air exchange from sustained fan-only operation."""
 
     def __init__(self) -> None:
-        self._samples: deque[tuple[float, float, float, int]] = deque(maxlen=12)
+        # The coordinator observes every 30 seconds. Keep enough samples for a
+        # 12-minute measurement window even when updates arrive more often.
+        self._samples: deque[tuple[float, float, float, int]] = deque(maxlen=360)
         self._rates: deque[float] = deque(maxlen=8)
+        self._last_rate_at: float | None = None
 
     @property
     def rate(self) -> float | None:
@@ -50,16 +53,23 @@ class FreshAirEffect:
             self._samples.clear()
             return
         self._samples.append((timestamp, indoor, outdoor, fan_speed))
-        if len(self._samples) < 5:
+        while self._samples and timestamp - self._samples[0][0] > 25 * 60:
+            self._samples.popleft()
+        if self._last_rate_at is not None and timestamp - self._last_rate_at < 3 * 60:
             return
-        start = self._samples[-5]
+        # Use a reading at least 12 minutes old. The previous last-five-sample
+        # window spanned only two minutes at the normal 30-second poll rate.
+        start = next((sample for sample in reversed(self._samples) if timestamp - sample[0] >= 12 * 60), None)
+        if start is None:
+            return
         minutes = (timestamp - start[0]) / 60.0
-        if not 10 <= minutes <= 25:
+        if not 12 <= minutes <= 25:
             return
-        if any(abs(sample[2] - outdoor) > 2.0 for sample in list(self._samples)[-5:]):
+        window = [sample for sample in self._samples if sample[0] >= start[0]]
+        if any(abs(sample[2] - outdoor) > 2.0 for sample in window):
             return
-        fan_fraction = sum(sample[3] for sample in list(self._samples)[-5:]) / 50.0
-        outdoor_mean = sum(sample[2] for sample in list(self._samples)[-5:]) / 5.0
+        fan_fraction = sum(sample[3] for sample in window) / (10.0 * len(window))
+        outdoor_mean = sum(sample[2] for sample in window) / len(window)
         gap = start[1] - outdoor_mean
         if gap < 1.0:
             return
@@ -67,6 +77,7 @@ class FreshAirEffect:
         rate = (idle_end - indoor) / ((minutes / 60.0) * gap * fan_fraction)
         if isfinite(rate) and 0 <= rate <= 3.0:
             self._rates.append(rate)
+            self._last_rate_at = timestamp
 
 
 @dataclass(frozen=True)

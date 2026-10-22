@@ -89,6 +89,32 @@ def test_fresh_air_effect_requires_sustained_observations():
     assert effect.rate > 0.0
 
 
+def test_fresh_air_effect_learns_at_normal_thirty_second_update_rate():
+    effect = FreshAirEffect()
+    model = RCModel(C=1.0, U=0.1)
+    for index in range(24):
+        effect.observe(
+            timestamp=index * 30.0,
+            indoor=26.0 - index * 0.02,
+            outdoor=20.0,
+            fan_speed=8,
+            mode=MODE_VENTILATE,
+            model=model,
+        )
+    assert effect.rate is None  # Less than the required 12-minute window.
+    for index in range(24, 37):
+        effect.observe(
+            timestamp=index * 30.0,
+            indoor=26.0 - index * 0.02,
+            outdoor=20.0,
+            fan_speed=8,
+            mode=MODE_VENTILATE,
+            model=model,
+        )
+    assert effect.rate is not None
+    assert effect.rate > 0.0
+
+
 def test_hourly_forecast_interpolates_from_live_outdoor_reading():
     now = datetime(2026, 10, 22, tzinfo=timezone.utc)
     value, used = _forecast_value(
