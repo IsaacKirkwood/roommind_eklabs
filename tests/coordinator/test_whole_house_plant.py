@@ -194,6 +194,16 @@ async def test_plant_mode_command_is_not_blocked_by_fan_command_failure(
         {"entity_id": "climate.magiqtouch_zone_1", "hvac_mode": "cool"},
     )
 
+    await coordinator._async_control_whole_house_plant(
+        {}, _settings(fresh_air_max_outdoor_temperature=20.0)
+    )
+    fan_calls = [
+        item for item in hass.services.async_call.await_args_list
+        if item.args[:2] == ("climate", "set_fan_mode")
+    ]
+    assert len(fan_calls) == 2
+    assert coordinator._whole_house_plant_manager.state.commanded_fan_speed is None
+
 
 @pytest.mark.asyncio
 async def test_plant_reports_controller_mode_while_cooling_command_is_pending(

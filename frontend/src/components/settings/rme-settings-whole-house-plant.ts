@@ -162,7 +162,7 @@ export class RmeSettingsWholeHousePlant extends LitElement {
       )}
       ${this._section(
         "Run times & fan speed",
-        "Minimum runs reduce rapid cycling. Cooling fan speed scales with demand; fresh air uses a fixed speed.",
+        "Minimum runs reduce rapid cycling. Fan speed rises with cooling demand and slows as the house approaches its target.",
         html`
           <div class="grid">
             ${this._number("Minimum evaporative run", "minimum_cooling_run_minutes", "min", 0, 120, 5, "Keep evaporative cooling running for at least this long unless a safety gate opens.")}
@@ -171,7 +171,7 @@ export class RmeSettingsWholeHousePlant extends LitElement {
             ${this._number("Minimum fresh-air run", "minimum_ventilation_run_minutes", "min", 0, 120, 5, "Keep fan-only cooling running for at least this long unless a safety gate opens.")}
             ${this._number("Cooling minimum fan speed", "cooling_fan_min_speed", "/ 10", 1, 10, 1, "Lowest fan level for a small evaporative cooling demand.")}
             ${this._number("Cooling maximum fan speed", "cooling_fan_max_speed", "/ 10", 1, 10, 1, "Highest fan level used as cooling demand grows.")}
-            ${this._number("Fresh-air fan speed", "ventilation_fan_speed", "/ 10", 1, 10, 1, "Fixed fan level for fan-only cooling and fresh-air requests.")}
+            ${this._number("Fresh-air minimum fan speed", "ventilation_fan_speed", "/ 10", 1, 10, 1, "Base speed for fresh-air requests. When outdoor air is cooler than indoors, fan-only cooling can rise toward the cooling maximum as the temperature gap grows.")}
             ${this._number("Maximum continuous run", "max_continuous_runtime_minutes", "min", 15, 720, 15, "Stops the plant after this continuous runtime and reports a fault.")}
           </div>
         `,

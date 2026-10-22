@@ -285,14 +285,23 @@ class WholeHousePlantManager:
             )
             else indoor_temperature
         )
-        fan_speed = self._fan_speed(desired, fan_temperature)
+        fan_speed = self._fan_speed(
+            desired,
+            fan_temperature,
+            outdoor_cooler=(
+                indoor_temperature is not None
+                and outdoor_temperature is not None
+                and outdoor_temperature < indoor_temperature
+            ),
+        )
         transition = desired != self.state.commanded_mode
         fan_speed_changed = desired != MODE_OFF and fan_speed != self.state.commanded_fan_speed
         if transition:
             self.state.commanded_mode = desired
             self.state.mode_since = timestamp if desired != MODE_OFF else None
             self.state.mismatch_since = None
-        self.state.commanded_fan_speed = fan_speed
+        if desired == MODE_OFF:
+            self.state.commanded_fan_speed = None
 
         return WholeHousePlantPlan(
             mode=desired,
@@ -343,14 +352,24 @@ class WholeHousePlantManager:
     def _mode_name(mode: str) -> str:
         return "cooling" if mode == MODE_COOL else "fresh-air"
 
-    def _fan_speed(self, mode: str, indoor_temperature: float | None) -> int | None:
+    def confirm_fan_speed(self, speed: int) -> None:
+        """Remember a fan command only after Home Assistant accepts it."""
+        self.state.commanded_fan_speed = speed
+
+    def _fan_speed(
+        self, mode: str, indoor_temperature: float | None, *, outdoor_cooler: bool
+    ) -> int | None:
         """Choose a MagIQtouch manual fan level from 1 to 10."""
         if mode == MODE_VENTILATE:
-            return min(10, max(1, self.config.ventilation_fan_speed))
-        if mode != MODE_COOL:
+            low = min(10, max(1, self.config.ventilation_fan_speed))
+            if not outdoor_cooler:
+                return low
+            high = min(10, max(low, self.config.cooling_fan_max_speed))
+        elif mode == MODE_COOL:
+            low = min(10, max(1, self.config.cooling_fan_min_speed))
+            high = min(10, max(low, self.config.cooling_fan_max_speed))
+        else:
             return None
-        low = min(10, max(1, self.config.cooling_fan_min_speed))
-        high = min(10, max(low, self.config.cooling_fan_max_speed))
         if indoor_temperature is None or high == low:
             return low
         demand = max(0.0, indoor_temperature - self.config.cooling_target - self.config.cooling_start_delta)

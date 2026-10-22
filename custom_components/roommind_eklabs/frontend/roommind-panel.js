@@ -6673,7 +6673,7 @@
             ${this._number(`Minimum evaporative advantage`,`evaporative_min_indoor_outdoor_delta`,`°C`,0,15,.5,`Required difference between indoor temperature and estimated outdoor wet-bulb temperature.`)}
           </div>
         `)}
-      ${this._section(`Run times & fan speed`,`Minimum runs reduce rapid cycling. Cooling fan speed scales with demand; fresh air uses a fixed speed.`,g`
+      ${this._section(`Run times & fan speed`,`Minimum runs reduce rapid cycling. Fan speed rises with cooling demand and slows as the house approaches its target.`,g`
           <div class="grid">
             ${this._number(`Minimum evaporative run`,`minimum_cooling_run_minutes`,`min`,0,120,5,`Keep evaporative cooling running for at least this long unless a safety gate opens.`)}
             ${this._number(`Maximum evaporative run`,`maximum_cooling_run_minutes`,`min`,0,720,10,`After this much continuous water cooling, switch to fresh air only when outside is cooler than indoors; otherwise rest off. Zero disables timed rests.`)}
@@ -6681,7 +6681,7 @@
             ${this._number(`Minimum fresh-air run`,`minimum_ventilation_run_minutes`,`min`,0,120,5,`Keep fan-only cooling running for at least this long unless a safety gate opens.`)}
             ${this._number(`Cooling minimum fan speed`,`cooling_fan_min_speed`,`/ 10`,1,10,1,`Lowest fan level for a small evaporative cooling demand.`)}
             ${this._number(`Cooling maximum fan speed`,`cooling_fan_max_speed`,`/ 10`,1,10,1,`Highest fan level used as cooling demand grows.`)}
-            ${this._number(`Fresh-air fan speed`,`ventilation_fan_speed`,`/ 10`,1,10,1,`Fixed fan level for fan-only cooling and fresh-air requests.`)}
+            ${this._number(`Fresh-air minimum fan speed`,`ventilation_fan_speed`,`/ 10`,1,10,1,`Base speed for fresh-air requests. When outdoor air is cooler than indoors, fan-only cooling can rise toward the cooling maximum as the temperature gap grows.`)}
             ${this._number(`Maximum continuous run`,`max_continuous_runtime_minutes`,`min`,15,720,15,`Stops the plant after this continuous runtime and reports a fault.`)}
           </div>
         `)}
@@ -7748,7 +7748,7 @@
                     </button>
                   </div>`:_}
           </div>
-          <div class="export-split" ?hidden=${this.selectedRoom===In}>
+          <div class="export-split">
             <button
               class="export-btn"
               ?disabled=${this._diagLoading}

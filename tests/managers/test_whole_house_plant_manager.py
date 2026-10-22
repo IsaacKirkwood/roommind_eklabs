@@ -376,6 +376,26 @@ def test_cooling_fan_speed_scales_with_temperature_demand():
     assert high.fan_speed == 10
 
 
+def test_fresh_air_fan_scales_only_when_outdoor_air_can_cool():
+    config = WholeHousePlantConfig(
+        "climate.plant",
+        cooling_target=24.0,
+        fresh_air_max_outdoor_temperature=30.0,
+        fresh_air_requires_cooler_outdoor=False,
+        ventilation_fan_speed=4,
+        cooling_fan_max_speed=10,
+    )
+    low = _evaluate(WholeHousePlantManager(config), indoor_temperature=24.5, outdoor_temperature=20.0)
+    medium = _evaluate(WholeHousePlantManager(config), indoor_temperature=26.5, outdoor_temperature=20.0)
+    high = _evaluate(WholeHousePlantManager(config), indoor_temperature=28.0, outdoor_temperature=20.0)
+    warmer = _evaluate(WholeHousePlantManager(config), indoor_temperature=28.0, outdoor_temperature=29.0)
+    assert (low.mode, medium.mode, high.mode, warmer.mode) == (MODE_VENTILATE,) * 4
+    assert low.fan_speed == 4
+    assert 4 < medium.fan_speed < 10
+    assert high.fan_speed == 10
+    assert warmer.fan_speed == 4
+
+
 def test_safety_gate_overrides_minimum_run():
     manager = WholeHousePlantManager(
         WholeHousePlantConfig("climate.plant", minimum_cooling_run_minutes=30)

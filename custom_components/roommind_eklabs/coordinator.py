@@ -864,6 +864,15 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         command_needed = plan.transition or (
             feedback_available and reported_mode != plan.mode
         )
+        fan_command_needed = plan.fan_speed is not None and (
+            plan.fan_speed_changed
+            or (
+                feedback_available
+                and actual_mode == plan.mode
+                and reported_fan_speed is not None
+                and reported_fan_speed != plan.fan_speed
+            )
+        )
         mode_command_sent = False
         if command_needed:
             try:
@@ -877,12 +886,12 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                 mode_command_sent = True
             except Exception:  # noqa: BLE001
                 _LOGGER.exception("Whole-house plant command failed for '%s'", entity_id)
-        if mode_command_sent and plan.mode != PLANT_MODE_OFF and plan.fan_speed_changed:
+        if mode_command_sent and plan.mode != PLANT_MODE_OFF and fan_command_needed:
             # Start the plant before adjusting its fan. A slow fan-speed write
             # must never prevent the primary mode command from reaching it.
             await asyncio.sleep(PLANT_COMMAND_SETTLE_SECONDS)
         fan_command_sent = False
-        if plan.fan_speed_changed and plan.fan_speed is not None:
+        if fan_command_needed:
             try:
                 await self.hass.services.async_call(
                     "climate",
@@ -892,6 +901,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                     context=make_roommind_context(),
                 )
                 fan_command_sent = True
+                self._whole_house_plant_manager.confirm_fan_speed(plan.fan_speed)
             except Exception:  # noqa: BLE001
                 _LOGGER.exception("Whole-house plant fan command failed for '%s'", entity_id)
         if fan_command_sent and plan.mode != PLANT_MODE_OFF:
