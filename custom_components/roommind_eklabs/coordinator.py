@@ -79,6 +79,7 @@ from .managers.whole_house_mpc import (
     WholeHouseMpcAdvice,
     get_whole_house_mpc_advice,
 )
+from .managers.whole_house_forecast import FreshAirEffect, predict_whole_house_operation
 from .managers.whole_house_plant_manager import (
     MODE_OFF as PLANT_MODE_OFF,
 )
@@ -207,6 +208,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         self._whole_house_plant_entity = ""
         self._whole_house_plant_live: dict[str, Any] = {}
         self._whole_house_mpc_advice: WholeHouseMpcAdvice | None = None
+        self._whole_house_fresh_air_effect = FreshAirEffect()
         # Track which rooms already have entity platform entities registered
         self._entity_areas: set[str] = set()
         # Min-run enforcement: timestamp when current non-idle mode started
@@ -571,6 +573,24 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         entity_id = str(raw.get("entity_id", ""))
         plant_state = self.hass.states.get(entity_id) if entity_id else None
         plant_mode = plant_state.state if plant_state is not None else PLANT_MODE_OFF
+        try:
+            observed_fan_speed = int(plant_state.attributes.get("fan_mode")) if plant_state else None
+        except (TypeError, ValueError):
+            observed_fan_speed = None
+        self._whole_house_fresh_air_effect.observe(
+            timestamp=time.monotonic(),
+            indoor=temperature,
+            outdoor=self.outdoor_temp_effective,
+            fan_speed=observed_fan_speed,
+            mode=(
+                plant_mode
+                if not heating_active
+                and self._model_manager.get_mode_counts(WHOLE_HOUSE_MODEL_ID)[0] >= 60
+                else PLANT_MODE_OFF
+            ),
+            model=self._model_manager.get_model(WHOLE_HOUSE_MODEL_ID),
+            q_solar=self._current_q_solar,
+        )
         if heating_active and plant_mode == "cool":
             training_mode = None
             power_fraction = 0.0
@@ -816,6 +836,29 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                 f"({actual_mode.replace('_', ' ')})"
             )
 
+        operating_forecast = predict_whole_house_operation(
+            manager=self._whole_house_plant_manager,
+            initial_plan=plan,
+            model=self._model_manager.get_model(WHOLE_HOUSE_MODEL_ID),
+            fresh_air_rate=self._whole_house_fresh_air_effect.rate,
+            idle_ready=bool(self._whole_house_mpc_advice and self._whole_house_mpc_advice.n_idle >= 60),
+            cooling_ready=bool(self._whole_house_mpc_advice and self._whole_house_mpc_advice.cooling_ready),
+            indoor_temperature=indoor_temperature,
+            indoor_humidity=indoor_humidity,
+            outdoor_temperature=self.outdoor_temp_effective,
+            outdoor_humidity=self.outdoor_humidity,
+            home_occupied=home_occupied,
+            area_occupied=occupied,
+            heating_active=heating_active,
+            exhaust_ready=exhaust_ready,
+            outdoor_air_safe=outdoor_air_safe,
+            ventilation_requested=ventilation_requested,
+            forecast_high_temperature=forecast_high,
+            forecast_peak_hours_away=forecast_peak_hours,
+            now=time.monotonic(),
+            q_solar=self._current_q_solar,
+        ) if not command_pending and feedback_available and not plan.fault else None
+
         self._whole_house_plant_live = {
             "configured": True,
             "entity_id": entity_id,
@@ -842,6 +885,12 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                 self._whole_house_mpc_advice.predicted_temperature
                 if self._whole_house_mpc_advice is not None
                 else None
+            ),
+            "operating_predicted_temperature": (
+                operating_forecast.temperature if operating_forecast is not None else None
+            ),
+            "operating_predicted_modes": (
+                list(dict.fromkeys(operating_forecast.modes)) if operating_forecast is not None else []
             ),
             "mpc_heating_active": bool(
                 self._whole_house_mpc_advice and self._whole_house_mpc_advice.heating_ready

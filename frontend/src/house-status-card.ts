@@ -127,7 +127,7 @@ export class RoomMindHouseStatusCard extends LitElement {
     const current = live?.current_temperature;
     const target = live?.target_temperature ?? plant?.cooling_target;
     const delta = typeof current === "number" && typeof target === "number" ? current - target : null;
-    const predicted = live?.predicted_temperature;
+    const predicted = live?.operating_predicted_temperature;
     const sourceWarning = this._sourceWarning();
     const status = plant ? this._modeLabel(plant) : "Waiting for RoomMind";
     const accent = live?.fault || sourceWarning ? "warning" : live?.mode === "cool" ? "cool" : live?.mode === "fan_only" ? "fan" : "idle";
@@ -148,7 +148,7 @@ export class RoomMindHouseStatusCard extends LitElement {
               </div>
               <div class="compact-readings">
                 <div class="compact-prediction">
-                  <span>In 30 min without cooling</span>
+                  <span>In 30 min with RoomMind</span>
                   <strong>${typeof predicted === "number" ? temperatureWithUnit(predicted) : "Learning…"}</strong>
                 </div>
                 <div class="compact-fan">Fan ${typeof live?.fan_speed === "number" ? `${live.fan_speed} / 10` : live?.mode === "off" ? "off" : "–"}</div>
@@ -202,9 +202,9 @@ export class RoomMindHouseStatusCard extends LitElement {
             <div>
               <div class="outlook-title">What the model predicts</div>
               ${typeof predicted === "number"
-                ? html`<div class="outlook-value">Without cooling: about <strong>${temperature(predicted)}${unit}</strong> in 30 minutes.</div>`
-                : html`<div class="outlook-value">RoomMind is still learning the house temperature trend.</div>`}
-              <div class="outlook-note">This is an estimate if cooling stopped; actual temperature can differ while the system runs.</div>
+                ? html`<div class="outlook-value">With RoomMind running: about <strong>${temperature(predicted)}${unit}</strong> in 30 minutes.</div>`
+                : html`<div class="outlook-value">RoomMind is still learning the cooling effect, or waiting for the controller.</div>`}
+              <div class="outlook-note">Follows planned fresh-air, evaporative and rest periods at today's outdoor conditions. Actual temperature may differ.</div>
             </div>
           </div>
           <div class="footer">${this._updatedAt ? `Updated ${new Date(this._updatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Waiting for an update"} · View only</div>

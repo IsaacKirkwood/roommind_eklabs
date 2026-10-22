@@ -116,10 +116,10 @@ Forecast pre-cooling uses the highest **remaining hourly forecast temperature fo
 
 RoomMind includes a read-only dashboard card for household members who want to see what the whole-house cooler is doing without changing its settings. The full layout shows the indoor temperature, cooling target, outdoor temperature, fan speed, humidity, current mode, why that mode was chosen, the highest remaining forecast temperature today, and a 30-minute model estimate.
 
-Install [RoomMind v0.8.24 or later](https://github.com/IsaacKirkwood/roommind_eklabs/releases/latest) and restart Home Assistant. In **Settings → Dashboards → Resources**, add the following URL as a **JavaScript module**. If you already added the card with v0.8.23, **edit the existing resource URL** to this one so your tablet loads the compact layout:
+Install [RoomMind v0.8.25 or later](https://github.com/IsaacKirkwood/roommind_eklabs/releases/latest) and restart Home Assistant. In **Settings → Dashboards → Resources**, add the following URL as a **JavaScript module**. If you already added the card, **edit the existing resource URL** to this one so your dashboard loads the new prediction:
 
 ```text
-/roommind_eklabs/roommind-house-status-card.js?v=0.8.24
+/roommind_eklabs/roommind-house-status-card.js?v=0.8.25
 ```
 
 Add a **Manual** card to any dashboard for the full layout:
@@ -140,7 +140,7 @@ control_source_entity: select.magiqtouch_esp32_controller_control_source
 
 The `control_source_entity` line is optional; on this MagIQcool setup it adds a warning if the wall panel takes control. Leave it out on other systems. To switch an existing full card to compact, add `compact: true` to its YAML; remove the line to return to the full layout.
 
-The prediction is the estimated indoor temperature **if cooling stopped for 30 minutes**. It is not an estimate of when active cooling will reach the target. The card refreshes RoomMind's state every minute and has no controls. If the previous layout remains after the resource URL changes, reload the dashboard in the browser or reset the Home Assistant Companion app's frontend cache.
+The single 30-minute prediction follows RoomMind's planned operation: fresh-air fan, evaporative cooling, and rest periods as its normal rules switch between them. It uses the learned whole-house cooling model and estimates the fresh-air effect from sustained fan-only operation. While either effect is still being learned, or while the controller is changing mode, the card shows “Learning…” instead of an unsupported number. The projection assumes outdoor temperature, humidity, solar input, occupancy, and demand remain at their current values; it is an estimate, not a target arrival time. The card refreshes RoomMind's state every minute and has no controls. If the previous layout remains after the resource URL changes, reload the dashboard in the browser or reset the Home Assistant Companion app's frontend cache.
 
 ## Analytics
 
