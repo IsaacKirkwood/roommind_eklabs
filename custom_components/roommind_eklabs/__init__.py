@@ -158,6 +158,7 @@ async def _async_register_panel(hass: HomeAssistant) -> None:
         return
 
     panel_js = Path(__file__).parent / "frontend" / "roommind-panel.js"
+    card_js = Path(__file__).parent / "frontend" / "roommind-house-status-card.js"
     if not panel_js.exists():
         _LOGGER.warning(
             "RoomMind panel JS not found at %s – sidebar panel not registered",
@@ -167,7 +168,10 @@ async def _async_register_panel(hass: HomeAssistant) -> None:
 
     try:
         await hass.http.async_register_static_paths(
-            [StaticPathConfig("/roommind_eklabs/roommind-panel.js", str(panel_js), False)]
+            [
+                StaticPathConfig("/roommind_eklabs/roommind-panel.js", str(panel_js), False),
+                StaticPathConfig("/roommind_eklabs/roommind-house-status-card.js", str(card_js), False),
+            ]
         )
     except RuntimeError:
         _LOGGER.debug("RoomMind static path already registered")

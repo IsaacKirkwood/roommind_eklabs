@@ -206,6 +206,8 @@ export interface WholeHousePlant {
     fault?: string | null;
     current_temperature?: number | null;
     current_humidity?: number | null;
+    target_temperature?: number | null;
+    forecast_high_temperature?: number | null;
     outdoor_aqi?: number | null;
     outdoor_air_safe?: boolean;
     cooling_allowed?: boolean;

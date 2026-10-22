@@ -112,6 +112,33 @@ In **RoomMind > Settings > Whole-house cooler**, select **Auto** to let RoomMind
 
 Forecast pre-cooling uses the highest **remaining hourly forecast temperature for the current local day** from the configured weather entity. If the forecast is unavailable, RoomMind follows the normal temperature and humidity rules. Manual **Cool** mode or a temporary Cool override forces evaporative cooling and bypasses Auto's mode choice and timed rest. Presence, air-quality, controller feedback, and gas-heating interlocks still apply. Ducted evaporative cooling needs an open window, door, or other exhaust path; configure **Require an open exhaust path** with a suitable sensor if you have one.
 
+### House cooling dashboard card
+
+RoomMind includes a read-only dashboard card designed to explain whole-house cooling at a glance. It shows the current and target temperatures, outdoor temperature, fan speed, humidity, current mode, the reason for that mode, the highest remaining forecast temperature today, and the model's 30-minute temperature estimate **if cooling stopped**. That estimate is not an arrival-time prediction while the cooler is running.
+
+After updating RoomMind and restarting Home Assistant, add a **JavaScript module** resource in **Settings → Dashboards → Resources**:
+
+```text
+/roommind_eklabs/roommind-house-status-card.js?v=0.8.23
+```
+
+Then add a **Manual** card to any dashboard:
+
+```yaml
+type: custom:roommind-house-status-card
+title: House cooling
+```
+
+Optionally show when the MagIQcool wall panel has taken control by adding its control-source select entity:
+
+```yaml
+type: custom:roommind-house-status-card
+title: House cooling
+control_source_entity: select.magiqtouch_esp32_controller_control_source
+```
+
+The card refreshes RoomMind's whole-house state every minute. It has no controls, so household members can check it without changing any cooling settings.
+
 ## Analytics
 
 ![Analytics](docs/images/page-analytics.png)
