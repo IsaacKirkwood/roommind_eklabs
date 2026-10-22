@@ -218,6 +218,7 @@ export interface WholeHousePlant {
     predicted_temperature?: number | null;
     operating_predicted_temperature?: number | null;
     operating_predicted_modes?: Array<"off" | "cool" | "fan_only">;
+    operating_forecast_weather_used?: boolean;
     mpc_heating_active?: boolean;
     mpc_cooling_active?: boolean;
     mpc_confidence?: number;

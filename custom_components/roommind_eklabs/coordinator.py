@@ -855,6 +855,8 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             ventilation_requested=ventilation_requested,
             forecast_high_temperature=forecast_high,
             forecast_peak_hours_away=forecast_peak_hours,
+            weather_forecast=self._weather_manager.forecast,
+            forecast_now=dt_util.utcnow(),
             now=time.monotonic(),
             q_solar=self._current_q_solar,
         ) if not command_pending and feedback_available and not plan.fault else None
@@ -891,6 +893,9 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             ),
             "operating_predicted_modes": (
                 list(dict.fromkeys(operating_forecast.modes)) if operating_forecast is not None else []
+            ),
+            "operating_forecast_weather_used": bool(
+                operating_forecast and operating_forecast.weather_forecast_used
             ),
             "mpc_heating_active": bool(
                 self._whole_house_mpc_advice and self._whole_house_mpc_advice.heating_ready

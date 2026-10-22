@@ -5,12 +5,12 @@ from __future__ import annotations
 from collections import deque
 from copy import deepcopy
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from math import isfinite
 
 from ..control.thermal_model import RCModel
 from .whole_house_plant_manager import (
     MODE_COOL,
-    MODE_OFF,
     MODE_VENTILATE,
     WholeHousePlantManager,
     WholeHousePlantPlan,
@@ -73,6 +73,45 @@ class FreshAirEffect:
 class WholeHouseForecast:
     temperature: float | None
     modes: tuple[str, ...]
+    weather_forecast_used: bool = False
+
+
+def _forecast_value(
+    forecast: list[dict],
+    *,
+    field: str,
+    current: float | None,
+    now: datetime,
+    minutes_ahead: float,
+) -> tuple[float | None, bool]:
+    """Interpolate from the current reading to upcoming hourly weather values."""
+    if current is None or now.tzinfo is None:
+        return current, False
+    points: list[tuple[datetime, float]] = []
+    for entry in forecast:
+        try:
+            when = datetime.fromisoformat(str(entry.get("datetime", "")).replace("Z", "+00:00"))
+            value = float(entry[field])
+        except (TypeError, ValueError, KeyError):
+            continue
+        if (
+            when.tzinfo is not None
+            and now < when <= now + timedelta(hours=2)
+            and isfinite(value)
+            and (field != "humidity" or 0.0 <= value <= 100.0)
+        ):
+            points.append((when, value))
+    if not points:
+        return current, False
+    points.sort(key=lambda item: item[0])
+    target = now + timedelta(minutes=minutes_ahead)
+    previous_time, previous_value = now, current
+    for when, value in points:
+        if target <= when:
+            fraction = (target - previous_time) / (when - previous_time)
+            return previous_value + (value - previous_value) * fraction, True
+        previous_time, previous_value = when, value
+    return previous_value, True
 
 
 def predict_whole_house_operation(
@@ -95,25 +134,52 @@ def predict_whole_house_operation(
     ventilation_requested: bool,
     forecast_high_temperature: float | None,
     forecast_peak_hours_away: float | None,
+    weather_forecast: list[dict],
+    forecast_now: datetime,
     now: float,
     q_solar: float = 0.0,
 ) -> WholeHouseForecast:
-    """Simulate thirty minutes of RoomMind decisions at fixed outdoor conditions."""
+    """Simulate RoomMind decisions using the available hourly weather forecast."""
     if indoor_temperature is None or outdoor_temperature is None or not idle_ready:
         return WholeHouseForecast(None, ())
     simulated = deepcopy(manager)
     temperature = indoor_temperature
     plan = initial_plan
     modes: list[str] = []
+    weather_used = False
     for step in range(FORECAST_MINUTES // STEP_MINUTES):
+        elapsed_minutes = step * STEP_MINUTES
+        step_outdoor, temperature_forecast_used = _forecast_value(
+            weather_forecast,
+            field="temperature",
+            current=outdoor_temperature,
+            now=forecast_now,
+            minutes_ahead=elapsed_minutes,
+        )
+        step_humidity, humidity_forecast_used = _forecast_value(
+            weather_forecast,
+            field="humidity",
+            current=outdoor_humidity,
+            now=forecast_now,
+            minutes_ahead=elapsed_minutes,
+        )
+        midpoint_outdoor, _ = _forecast_value(
+            weather_forecast,
+            field="temperature",
+            current=outdoor_temperature,
+            now=forecast_now,
+            minutes_ahead=elapsed_minutes + STEP_MINUTES / 2,
+        )
+        weather_used = weather_used or temperature_forecast_used or humidity_forecast_used
+        assert step_outdoor is not None and midpoint_outdoor is not None
         if step:
             elapsed_hours = step * STEP_MINUTES / 60.0
-            idle_prediction = model.predict(temperature, outdoor_temperature, 0.0, FORECAST_MINUTES, q_solar=q_solar)
+            idle_prediction = model.predict(temperature, step_outdoor, 0.0, FORECAST_MINUTES, q_solar=q_solar)
             plan = simulated.evaluate(
                 indoor_temperature=temperature,
                 indoor_humidity=indoor_humidity,
-                outdoor_temperature=outdoor_temperature,
-                outdoor_humidity=outdoor_humidity,
+                outdoor_temperature=step_outdoor,
+                outdoor_humidity=step_humidity,
                 home_occupied=home_occupied,
                 area_occupied=area_occupied,
                 heating_active=heating_active,
@@ -135,15 +201,19 @@ def predict_whole_house_operation(
         modes.append(plan.mode)
         if plan.mode == MODE_COOL:
             if not cooling_ready:
-                return WholeHouseForecast(None, tuple(modes))
+                return WholeHouseForecast(None, tuple(modes), weather_used)
             power = -model.Q_cool * (plan.fan_speed or 10) / 10.0
-            temperature = model.predict(temperature, outdoor_temperature, power, STEP_MINUTES, q_solar=q_solar)
+            temperature = model.predict(temperature, midpoint_outdoor, power, STEP_MINUTES, q_solar=q_solar)
         elif plan.mode == MODE_VENTILATE:
             if fresh_air_rate is None:
-                return WholeHouseForecast(None, tuple(modes))
+                return WholeHouseForecast(None, tuple(modes), weather_used)
             ventilated = deepcopy(model)
             ventilated.U += fresh_air_rate * model.C * (plan.fan_speed or 10) / 10.0
-            temperature = ventilated.predict(temperature, outdoor_temperature, 0.0, STEP_MINUTES, q_solar=q_solar)
+            temperature = ventilated.predict(temperature, midpoint_outdoor, 0.0, STEP_MINUTES, q_solar=q_solar)
         else:
-            temperature = model.predict(temperature, outdoor_temperature, 0.0, STEP_MINUTES, q_solar=q_solar)
-    return WholeHouseForecast(max(indoor_temperature - 3.0, min(indoor_temperature + 3.0, temperature)), tuple(modes))
+            temperature = model.predict(temperature, midpoint_outdoor, 0.0, STEP_MINUTES, q_solar=q_solar)
+    return WholeHouseForecast(
+        max(indoor_temperature - 3.0, min(indoor_temperature + 3.0, temperature)),
+        tuple(modes),
+        weather_used,
+    )

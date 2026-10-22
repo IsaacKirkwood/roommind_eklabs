@@ -1,8 +1,11 @@
 """The card forecast must follow real whole-house mode transitions."""
 
+from datetime import datetime, timedelta, timezone
+
 from custom_components.roommind_eklabs.control.thermal_model import RCModel
 from custom_components.roommind_eklabs.managers.whole_house_forecast import (
     FreshAirEffect,
+    _forecast_value,
     predict_whole_house_operation,
 )
 from custom_components.roommind_eklabs.managers.whole_house_plant_manager import (
@@ -49,6 +52,8 @@ def _forecast(fresh_air_rate: float | None):
         ventilation_requested=False,
         forecast_high_temperature=None,
         forecast_peak_hours_away=None,
+        weather_forecast=[],
+        forecast_now=datetime(2026, 10, 22, tzinfo=timezone.utc),
         now=9 * 60.0,
     ), manager
 
@@ -82,3 +87,62 @@ def test_fresh_air_effect_requires_sustained_observations():
         )
     assert effect.rate is not None
     assert effect.rate > 0.0
+
+
+def test_hourly_forecast_interpolates_from_live_outdoor_reading():
+    now = datetime(2026, 10, 22, tzinfo=timezone.utc)
+    value, used = _forecast_value(
+        [{"datetime": (now + timedelta(hours=1)).isoformat(), "temperature": 30.0}],
+        field="temperature",
+        current=20.0,
+        now=now,
+        minutes_ahead=30.0,
+    )
+    assert used is True
+    assert value == 25.0
+
+
+def test_forecast_warming_can_switch_fresh_air_to_evaporative():
+    now = datetime(2026, 10, 22, tzinfo=timezone.utc)
+    manager = WholeHousePlantManager(WholeHousePlantConfig(
+        entity_id="climate.cooler",
+        cooling_target=23.0,
+        fresh_air_max_outdoor_temperature=28.0,
+        minimum_ventilation_run_minutes=0,
+        require_home_presence=False,
+        require_occupancy=False,
+    ))
+    manager.state.commanded_mode = MODE_VENTILATE
+    manager.state.mode_since = 0.0
+    plan = WholeHousePlantPlan(MODE_VENTILATE, False, "fresh air", None, True, True, True, 8, False)
+    shared = dict(
+        manager=manager,
+        initial_plan=plan,
+        model=RCModel(C=1.0, U=0.1, Q_cool=2.0),
+        fresh_air_rate=0.5,
+        idle_ready=True,
+        cooling_ready=True,
+        indoor_temperature=26.0,
+        indoor_humidity=40.0,
+        outdoor_temperature=20.0,
+        outdoor_humidity=40.0,
+        home_occupied=True,
+        area_occupied=True,
+        heating_active=False,
+        exhaust_ready=True,
+        outdoor_air_safe=True,
+        ventilation_requested=False,
+        forecast_high_temperature=None,
+        forecast_peak_hours_away=None,
+        forecast_now=now,
+        now=1800.0,
+    )
+    steady = predict_whole_house_operation(**shared, weather_forecast=[])
+    warming = predict_whole_house_operation(
+        **shared,
+        weather_forecast=[{"datetime": (now + timedelta(minutes=30)).isoformat(), "temperature": 32.0}],
+    )
+    assert steady.modes == (MODE_VENTILATE,) * 6
+    assert MODE_COOL in warming.modes
+    assert warming.weather_forecast_used is True
+    assert warming.temperature != steady.temperature
