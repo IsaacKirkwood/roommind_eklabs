@@ -116,10 +116,10 @@ Forecast pre-cooling uses the highest **remaining hourly forecast temperature fo
 
 RoomMind includes a read-only dashboard card for household members who want to see what the whole-house cooler is doing without changing its settings. The full layout shows the indoor temperature, cooling target, outdoor temperature, fan speed, humidity, current mode, why that mode was chosen, the highest remaining forecast temperature today, and a 30-minute model estimate.
 
-Install [RoomMind v0.8.26 or later](https://github.com/IsaacKirkwood/roommind_eklabs/releases/latest) and restart Home Assistant. In **Settings → Dashboards → Resources**, add the following URL as a **JavaScript module**. If you already added the card, **edit the existing resource URL** to this one so your dashboard loads the new prediction:
+Install [RoomMind v0.8.27 or later](https://github.com/IsaacKirkwood/roommind_eklabs/releases/latest) and restart Home Assistant. In **Settings → Dashboards → Resources**, add the following URL as a **JavaScript module**. If you already added the card, **edit the existing resource URL** to this one so your dashboard loads the latest compact layout:
 
 ```text
-/roommind_eklabs/roommind-house-status-card.js?v=0.8.26
+/roommind_eklabs/roommind-house-status-card.js?v=0.8.27
 ```
 
 Add a **Manual** card to any dashboard for the full layout:
@@ -129,7 +129,7 @@ type: custom:roommind-house-status-card
 title: House cooling
 ```
 
-For a small tablet card, add `compact: true`. This layout keeps only the current indoor temperature, cooling status, fan speed, and 30-minute estimate. It omits the target, outdoor temperature, target gap, forecast high, detailed reason, and prediction footnote:
+For a small tablet card, add `compact: true`. This layout shows the current indoor temperature, cooling status, a brief reason for the current mode, fan speed, indoor humidity, and the 30-minute estimate. It omits the target, outdoor temperature, target gap, forecast high, and prediction footnote:
 
 ```yaml
 type: custom:roommind-house-status-card

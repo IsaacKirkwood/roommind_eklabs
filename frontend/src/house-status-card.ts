@@ -52,6 +52,31 @@ function explanation(reason: string | undefined): string {
   return known[plain] ?? plain.charAt(0).toUpperCase() + plain.slice(1);
 }
 
+function compactExplanation(reason: string | undefined): string {
+  const plain = reason?.split("; waiting for controller")[0];
+  const known: Record<string, string> = {
+    "fresh air preferred for cooling": "Cool outdoor air can lower the house temperature.",
+    "evaporative cooling demand": "The house is above its cooling target.",
+    "cooling selected": "Evaporative cooling was selected.",
+    "fresh air selected": "Fresh air was selected.",
+    "cooling target satisfied": "The cooling target has been reached.",
+    "minimum cooling run": "Finishing the minimum cooling run.",
+    "minimum fresh-air run": "Finishing the minimum fresh-air run.",
+    "evaporative rest; fresh air preferred": "Cooler resting; fresh air is suitable.",
+    "evaporative run limit; fresh air preferred": "Cooler run finished; fresh air took over.",
+    "evaporative run limit; resting": "Cooler is taking a scheduled break.",
+    "forecast pre-cooling before hot peak": "Cooling early for a forecast hot peak.",
+    "occupancy gate clear": "Waiting for home occupancy.",
+    "heating interlock": "Heating is active.",
+    "open an exhaust path": "Waiting for an open exhaust path.",
+    "outdoor air quality lockout": "Outdoor air quality is too poor.",
+    "manually off": "Cooling is turned off in RoomMind.",
+    "maximum runtime exceeded": "Maximum run time reached.",
+    "waiting for temperature data": "Waiting for temperature readings.",
+  };
+  return plain ? known[plain] ?? explanation(reason) : "Checking house conditions.";
+}
+
 @customElement("roommind-house-status-card")
 export class RoomMindHouseStatusCard extends LitElement {
   @property({ attribute: false }) hass?: HomeAssistant;
@@ -128,6 +153,11 @@ export class RoomMindHouseStatusCard extends LitElement {
     const target = live?.target_temperature ?? plant?.cooling_target;
     const delta = typeof current === "number" && typeof target === "number" ? current - target : null;
     const predicted = live?.operating_predicted_temperature;
+    const compactReason = !plant?.enabled
+      ? "Whole-house cooling is off."
+      : live?.command_pending
+        ? "Waiting for the controller to change mode."
+        : compactExplanation(live?.reason);
     const sourceWarning = this._sourceWarning();
     const status = plant ? this._modeLabel(plant) : "Waiting for RoomMind";
     const accent = live?.fault || sourceWarning ? "warning" : live?.mode === "cool" ? "cool" : live?.mode === "fan_only" ? "fan" : "idle";
@@ -146,12 +176,19 @@ export class RoomMindHouseStatusCard extends LitElement {
                 <div><span class="number">${temperature(current)}</span><span class="unit">${unit}</span></div>
                 <span class="caption">Inside now</span>
               </div>
+              <div class="compact-context">
+                <span class="compact-context-label">Why it's ${live?.mode === "off" ? "resting" : "running"}</span>
+                <div class="compact-reason" title=${explanation(live?.reason)}>${compactReason}</div>
+                <div class="compact-metrics">
+                  <span>Fan <strong>${typeof live?.fan_speed === "number" ? `${live.fan_speed} / 10` : live?.mode === "off" ? "off" : "–"}</strong></span>
+                  <span>Indoor humidity <strong>${typeof live?.current_humidity === "number" ? `${Math.round(live.current_humidity)}%` : "–"}</strong></span>
+                </div>
+              </div>
               <div class="compact-readings">
                 <div class="compact-prediction">
                   <span>In 30 min with RoomMind</span>
                   <strong>${typeof predicted === "number" ? temperatureWithUnit(predicted) : "Learning…"}</strong>
                 </div>
-                <div class="compact-fan">Fan ${typeof live?.fan_speed === "number" ? `${live.fan_speed} / 10` : live?.mode === "off" ? "off" : "–"}</div>
               </div>
             </div>
             ${this._error ? html`<p class="notice" role="status">${this._error}</p>` : nothing}
@@ -249,22 +286,27 @@ export class RoomMindHouseStatusCard extends LitElement {
     .outlook-value { margin-top: 3px; font-size: 14px; }
     .outlook-note { margin-top: 5px; color: var(--secondary-text-color); font-size: 11px; line-height: 1.35; }
     .footer { margin-top: 18px; color: var(--secondary-text-color); font-size: 10px; text-align: right; }
-    .compact { padding: 16px 18px; }
+    .compact { container-type: inline-size; padding: 16px 18px; }
     .compact-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
     .compact-header h2 { margin: 0; font-size: 16px; }
     .compact .status { max-width: 100%; padding: 5px 8px; font-size: 11px; }
-    .compact-main { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 13px; }
+    .compact-main { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; margin-top: 13px; }
     .compact-temperature { min-width: 0; }
     .compact-temperature > div { display: flex; align-items: flex-start; white-space: nowrap; }
     .compact .number { font-size: 43px; }
     .compact .unit { font-size: 15px; margin-top: 3px; }
     .compact .caption { display: block; margin-top: 2px; font-size: 11px; }
-    .compact-readings { display: grid; justify-items: end; gap: 7px; min-width: 0; text-align: right; }
+    .compact-context { min-width: 0; padding-left: 13px; border-left: 1px solid var(--divider-color); }
+    .compact-context-label { color: var(--secondary-text-color); font-size: 10px; }
+    .compact-reason { margin-top: 2px; font-size: 12px; font-weight: 600; line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+    .compact-metrics { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 5px; color: var(--secondary-text-color); font-size: 10px; }
+    .compact-metrics strong { color: var(--primary-text-color); font-size: 11px; }
+    .compact-readings { display: grid; justify-items: end; min-width: 0; text-align: right; }
     .compact-prediction { display: grid; gap: 2px; }
     .compact-prediction span { color: var(--secondary-text-color); font-size: 10px; line-height: 1.2; }
     .compact-prediction strong { font-size: 16px; line-height: 1.15; }
-    .compact-fan { color: var(--secondary-text-color); font-size: 11px; }
     .compact .notice { margin-top: 12px; font-size: 11px; }
+    @container (max-width: 620px) { .compact-main { grid-template-columns: minmax(0, 1fr) auto; gap: 10px 12px; } .compact-context { grid-column: 1 / -1; grid-row: 2; padding: 8px 0 0; border-left: 0; border-top: 1px solid var(--divider-color); } .compact-reason { -webkit-line-clamp: 1; } }
     @media (max-width: 420px) { .card { padding: 18px; } .header { flex-wrap: wrap; } .status { max-width: 100%; } .temperatures { grid-template-columns: 1fr; gap: 18px; } .number { font-size: 56px; } .card.compact { padding: 16px; } .compact .number { font-size: 40px; } }
   `;
 }
